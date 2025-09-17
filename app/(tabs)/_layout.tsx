@@ -4,10 +4,10 @@ export default function RootLayout() {
   
   return (
     <Tabs >
-      <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color, focused }) => (
+      <Tabs.Screen name="index" options={{ title: "Home",tabBarShowLabel: false, tabBarIcon: ({ color, focused }) => (
           <Ionicons name={focused ? 'home-sharp' : 'home-outline'} color={color} size={24} />
         ), }} />
-      <Tabs.Screen name="store" options={{ title: "Store", tabBarIcon: ({ color, focused }) => (
+      <Tabs.Screen name="store" options={{ title: "Store",tabBarShowLabel: false, tabBarIcon: ({ color, focused }) => (
           <Ionicons name={focused ? 'cart-sharp' : 'cart-outline'} color={color} size={24} />
         ), }} />
     </Tabs>
