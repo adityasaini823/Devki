@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { TouchableOpacity } from 'react-native';
 import { useTheme } from '../_theme/ThemeProvider';
-import StoreHeader from './StoreHeader';
+import StoreHeader from '../components/headers/StoreHeader';
 
 export default function RootLayout() {
   const { theme } = useTheme();
@@ -29,7 +29,6 @@ export default function RootLayout() {
       <Tabs.Screen
         name="store"
         options={{
-          
           header: () => <StoreHeader />,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'cart-sharp' : 'cart-outline'} color={color} size={24} />

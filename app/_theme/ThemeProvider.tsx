@@ -12,7 +12,7 @@ export type Theme = {
 
 const lightTheme: Theme = {
   colors: {
-    primary: '#035afc',
+    primary: '#035afc',    
     background: '#f4f4f4',
     card: '#ffffff',
     text: '#000000',

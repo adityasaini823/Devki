@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   FlatList,
   Image,
@@ -13,11 +13,7 @@ import {
 import { useTheme } from '../_theme/ThemeProvider';
 
 export default function Store() {
-  const [query, setQuery] = useState('');
-
-
   const items = [1, 2, 3, 4, 5, 6];
-  const filtered = items.filter((i) => `${i}`.includes(query) || query.trim() === '');
 
   const { theme } = useTheme();
 
@@ -25,7 +21,7 @@ export default function Store() {
     <KeyboardAvoidingView style={[styles.container, { backgroundColor: theme.colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
       <Text style={[styles.sectionTitle, { color: theme.colors.text, }]}>Featured Products</Text>
       <FlatList
-        data={filtered}
+        data={items}
         keyExtractor={(i) => `${i}`}
         numColumns={2}
         contentContainerStyle={styles.scrollContent}
