@@ -27,11 +27,6 @@ export default function RootLayout() {
           title: "Store",
           headerTitleStyle: { color: '#fff' },
           headerStyle: { backgroundColor: '#6200ee' },
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => {alert('Back pressed');}}>
-              <Ionicons name="arrow-back" size={24} color="#fff" style={{ marginLeft: 15 }} />
-            </TouchableOpacity>
-          ),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'cart-sharp' : 'cart-outline'} color={color} size={24} />
           ),

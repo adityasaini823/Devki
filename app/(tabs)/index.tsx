@@ -18,7 +18,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Section Title */}
       <Text style={styles.sectionTitle}>Recommended for you</Text>
 
       {/* Cards Section */}
@@ -39,7 +38,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+    container: {
     flex: 1,
     backgroundColor: "#f4f4f4",
   },
