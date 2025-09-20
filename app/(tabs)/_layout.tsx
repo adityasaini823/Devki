@@ -1,7 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { TouchableOpacity } from 'react-native';
+import { useTheme } from '../_theme/ThemeProvider';
+import StoreHeader from './StoreHeader';
+
 export default function RootLayout() {
+  const { theme } = useTheme();
+
   return (
     <Tabs screenOptions={{ tabBarShowLabel: false }}>
       <Tabs.Screen
@@ -12,7 +17,7 @@ export default function RootLayout() {
           ),
           headerShown: true,
           headerTitle: 'Devki-Your Milky Way',
-          headerStyle: { backgroundColor: '#6200ee' },
+          headerStyle: { backgroundColor: theme.colors.primary },
           headerTintColor: '#fff',
           headerRight: () => (
             <TouchableOpacity onPress={() => {alert('Profile pressed');}}>
@@ -24,9 +29,8 @@ export default function RootLayout() {
       <Tabs.Screen
         name="store"
         options={{
-          title: "Store",
-          headerTitleStyle: { color: '#fff' },
-          headerStyle: { backgroundColor: '#6200ee' },
+          
+          header: () => <StoreHeader />,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'cart-sharp' : 'cart-outline'} color={color} size={24} />
           ),
