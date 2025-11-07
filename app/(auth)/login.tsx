@@ -7,8 +7,15 @@ export default function Login() {
     const [mobileNumber, setMobileNumber] = useState('');
     
     const handleLogin = () => {
-        // @ts-ignore - Expo Router typed routes
-        router.push('/(auth)/otp');
+        if (mobileNumber.trim()) {
+            // @ts-ignore - Expo Router typed routes
+            router.push({
+                pathname: '/(auth)/otp',
+                params: { phone: mobileNumber },
+            });
+        } else {
+            alert('Please enter your mobile number');
+        }
     };
     
     return (
