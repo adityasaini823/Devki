@@ -52,9 +52,8 @@ export default function Login() {
         const cleanedNumber = mobileNumber.replace(/\D/g, '');
         if (cleanedNumber.length === 10) {
             Keyboard.dismiss();
-            // @ts-ignore - Expo Router typed routes
             router.push({
-                pathname: '/(auth)/otp',
+                pathname: '/otp',
                 params: { phone: cleanedNumber },
             });
         } else {
@@ -99,7 +98,7 @@ export default function Login() {
                                 onChangeText={handlePhoneChange}
                                 keyboardType="phone-pad"
                                 maxLength={12} // 5 digits + space + 5 digits
-                                returnKeyType="done"
+                                // returnKeyType="done"
                                 onSubmitEditing={handleLogin}
                             />
                         </View>
@@ -135,6 +134,7 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         justifyContent: 'center',
         padding: 24,
+        paddingBottom: 100,
         backgroundColor: '#FFFFFF',
     },
     content: {
