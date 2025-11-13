@@ -4,28 +4,25 @@ export default function AuthLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
+        headerShown: false, // Hide default headers - each screen has its own custom header
       }}
     >
       <Stack.Screen 
         name="login" 
         options={{ 
-          title: 'Login',
-          headerShown: true,
+          headerShown: false,
         }} 
       />
       <Stack.Screen 
         name="otp" 
         options={{ 
-          title: 'Enter OTP',
-          headerShown: true,
+          headerShown: false,
         }} 
       />
       <Stack.Screen 
         name="signup-details" 
         options={{ 
-          title: 'Signup Details',
-          headerShown: true,
+          headerShown: false,
         }} 
       />
     </Stack>
