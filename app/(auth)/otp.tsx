@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
+import authService from '../../src/services/authService';
 
 export default function Otp() {
     const router = useRouter();
@@ -21,7 +22,10 @@ export default function Otp() {
         ? formatPhoneNumber(params.phone as string)
         : '+91 98765 43210';
     
+    const cleanedPhone = params.phone ? (params.phone as string).replace(/\D/g, '') : '';
+    
     const [otp, setOtp] = useState(['', '', '', '']);
+    const [loading, setLoading] = useState(false);
     const inputRefs = useRef<(TextInput | null)[]>([]);
     
     const handleOtpChange = (text: string, index: number) => {
@@ -70,19 +74,68 @@ export default function Otp() {
         }
     };
     
-    const handleVerify = () => {
+    const handleVerify = async () => {
         const otpCode = otp.join('');
-        if (otpCode.length === 4) {
-            // Navigate to next screen or verify OTP
-            Keyboard.dismiss();
-            // @ts-ignore
-            router.push('/(auth)/signup-details');
+        if (otpCode.length !== 4) {
+            return;
+        }
+        
+        if (!cleanedPhone || cleanedPhone.length !== 10) {
+            Alert.alert('Error', 'Phone number is missing or invalid.');
+            return;
+        }
+        
+        Keyboard.dismiss();
+        setLoading(true);
+        
+        try {
+            const response = await authService.verifyOTP(cleanedPhone, otpCode);
+            
+            if (response.success) {
+                // Check if profile needs to be completed
+                if (response.needsProfile) {
+                    // Navigate to signup details with phone number
+                    router.push({
+                        pathname: '/(auth)/signup-details',
+                        params: { phone: cleanedPhone },
+                    });
+                } else {
+                    // Profile is complete, navigate to home
+                    // Store token if needed (you might want to use AsyncStorage)
+                    router.replace('/(tabs)');
+                }
+            } else {
+                Alert.alert('Error', response.message || 'OTP verification failed. Please try again.');
+            }
+        } catch (error: any) {
+            console.error('OTP verification error:', error);
+            Alert.alert(
+                'Verification Failed',
+                error.message || 'Invalid OTP. Please check and try again.'
+            );
+        } finally {
+            setLoading(false);
         }
     };
     
-    const handleResend = () => {
-        // Handle resend OTP logic
-        alert('OTP resent to ' + phoneNumber);
+    const handleResend = async () => {
+        if (!cleanedPhone || cleanedPhone.length !== 10) {
+            Alert.alert('Error', 'Phone number is missing or invalid.');
+            return;
+        }
+        
+        try {
+            const response = await authService.sendLoginOTP(cleanedPhone);
+            if (response.success) {
+                Alert.alert('Success', 'OTP has been resent to ' + phoneNumber);
+                // Clear current OTP
+                setOtp(['', '', '', '']);
+            } else {
+                Alert.alert('Error', response.message || 'Failed to resend OTP. Please try again.');
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to resend OTP. Please try again.');
+        }
     };
     
     return (
@@ -119,13 +172,17 @@ export default function Otp() {
                 style={[
                     styles.verifyButton,
                     {
-                        backgroundColor: otp.join('').length === 4 ? '#8B5CF6' : '#D1D5DB',
+                        backgroundColor: (otp.join('').length === 4 && !loading) ? '#8B5CF6' : '#D1D5DB',
                     }
                 ]}
                 onPress={handleVerify}
-                disabled={otp.join('').length !== 4}
+                disabled={otp.join('').length !== 4 || loading}
             >
-                <Text style={styles.verifyButtonText}>Verify & Proceed</Text>
+                {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                    <Text style={styles.verifyButtonText}>Verify & Proceed</Text>
+                )}
             </TouchableOpacity>
             
             <View style={styles.resendContainer}>

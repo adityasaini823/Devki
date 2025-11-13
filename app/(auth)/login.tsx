@@ -9,15 +9,19 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    TouchableWithoutFeedback
+    TouchableWithoutFeedback,
+    ActivityIndicator,
+    Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
+import authService from '../../src/services/authService';
 
 export default function Login() {
     const router = useRouter();
     const { theme } = useTheme();
     const [mobileNumber, setMobileNumber] = useState('');
+    const [loading, setLoading] = useState(false);
     
     const formatPhoneNumber = (text: string) => {
         // Remove all non-digits
@@ -48,17 +52,48 @@ export default function Login() {
         }
     };
     
-    const handleLogin = () => {
+    const handleLogin = async () => {
         const cleanedNumber = mobileNumber.replace(/\D/g, '');
-        if (cleanedNumber.length === 10) {
-            Keyboard.dismiss();
-            // @ts-ignore - Expo Router typed routes
-            router.push({
-                pathname: '/(auth)/otp',
-                params: { phone: cleanedNumber },
-            });
-        } else {
-            alert('Please enter a valid 10-digit mobile number');
+        if (cleanedNumber.length !== 10) {
+            Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number');
+            return;
+        }
+
+        Keyboard.dismiss();
+        setLoading(true);
+
+        try {
+            const response = await authService.sendLoginOTP(cleanedNumber);
+            
+            if (response.success) {
+                // Navigate to OTP screen with phone number
+                router.push({
+                    pathname: '/(auth)/otp',
+                    params: { 
+                        phone: cleanedNumber,
+                        userExists: response.userExists ? 'true' : 'false'
+                    },
+                });
+            } else {
+                Alert.alert('Error', response.message || 'Failed to send OTP. Please try again.');
+            }
+        } catch (error: any) {
+            console.error('Login error:', error);
+            const errorMessage = error.message || 'Failed to send OTP. Please check your connection and try again.';
+            
+            // Show detailed error message
+            Alert.alert(
+                'Connection Error', 
+                errorMessage,
+                [
+                    {
+                        text: 'OK',
+                        style: 'default'
+                    }
+                ]
+            );
+        } finally {
+            setLoading(false);
         }
     };
     
@@ -108,13 +143,17 @@ export default function Login() {
                             style={[
                                 styles.button,
                                 {
-                                    backgroundColor: isValid ? '#8B5CF6' : '#D1D5DB',
+                                    backgroundColor: (isValid && !loading) ? '#8B5CF6' : '#D1D5DB',
                                 }
                             ]}
                             onPress={handleLogin}
-                            disabled={!isValid}
+                            disabled={!isValid || loading}
                         >
-                            <Text style={styles.buttonText}>Get OTP</Text>
+                            {loading ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.buttonText}>Get OTP</Text>
+                            )}
                         </TouchableOpacity>
                         
                         <Text style={[styles.termsText, { color: theme.colors.muted }]}>
