@@ -6,8 +6,7 @@ export default function Welcome() {
     const router = useRouter();
     
     const handleGetStarted = () => {
-        // @ts-ignore - Expo Router typed routes
-        router.push('/(auth)/login');
+        router.push('/(auth)/login' as any);
     };
     
     return (

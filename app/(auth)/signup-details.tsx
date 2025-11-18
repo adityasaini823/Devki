@@ -195,7 +195,6 @@ export default function SignupDetails() {
                 Alert.alert('Error', response.message || 'Failed to complete profile. Please try again.');
             }
         } catch (error: any) {
-            console.error('Complete profile error:', error);
             Alert.alert(
                 'Error',
                 error.message || 'Failed to complete profile. Please check your connection and try again.'

@@ -20,7 +20,9 @@ class AuthService {
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     
-    console.log('API Request:', url, options);
+    if (__DEV__) {
+      console.log('API Request:', url);
+    }
     
     const defaultHeaders = {
       'Content-Type': 'application/json',
@@ -53,12 +55,16 @@ class AuthService {
         try {
           data = await response.json();
         } catch (jsonError) {
-          console.error('JSON Parse Error:', jsonError);
+          if (__DEV__) {
+            console.error('JSON Parse Error:', jsonError);
+          }
           throw new Error('Invalid response from server');
         }
       } else {
         const text = await response.text();
-        console.error('Non-JSON Response:', text);
+        if (__DEV__) {
+          console.error('Non-JSON Response:', text);
+        }
         throw new Error(`Server error: ${response.status} ${response.statusText}`);
       }
 
@@ -68,7 +74,9 @@ class AuthService {
 
       return data;
     } catch (error: any) {
-      console.error('API Error:', error);
+      if (__DEV__) {
+        console.error('API Error:', error);
+      }
       
       // Handle different types of errors
       if (error.name === 'AbortError') {

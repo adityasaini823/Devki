@@ -20,7 +20,7 @@ export default function Otp() {
     
     const phoneNumber = params.phone 
         ? formatPhoneNumber(params.phone as string)
-        : '+91 98765 43210';
+        : '';
     
     const cleanedPhone = params.phone ? (params.phone as string).replace(/\D/g, '') : '';
     
@@ -101,14 +101,12 @@ export default function Otp() {
                     });
                 } else {
                     // Profile is complete, navigate to home
-                    // Store token if needed (you might want to use AsyncStorage)
                     router.replace('/(tabs)');
                 }
             } else {
                 Alert.alert('Error', response.message || 'OTP verification failed. Please try again.');
             }
         } catch (error: any) {
-            console.error('OTP verification error:', error);
             Alert.alert(
                 'Verification Failed',
                 error.message || 'Invalid OTP. Please check and try again.'

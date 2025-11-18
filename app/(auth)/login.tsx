@@ -71,14 +71,12 @@ export default function Login() {
                     pathname: '/(auth)/otp',
                     params: { 
                         phone: cleanedNumber,
-                        userExists: response.userExists ? 'true' : 'false'
                     },
                 });
             } else {
                 Alert.alert('Error', response.message || 'Failed to send OTP. Please try again.');
             }
         } catch (error: any) {
-            console.error('Login error:', error);
             const errorMessage = error.message || 'Failed to send OTP. Please check your connection and try again.';
             
             // Show detailed error message
