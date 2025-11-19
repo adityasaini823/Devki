@@ -6,7 +6,7 @@ export default function Welcome() {
     const router = useRouter();
     
     const handleGetStarted = () => {
-        router.push('/(auth)/login' as any);
+        router.push('/(auth)/login');
     };
     
     return (

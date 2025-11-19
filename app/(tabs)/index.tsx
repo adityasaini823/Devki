@@ -1,7 +1,18 @@
-import React from "react";
+import React, { useEffect ,useState} from "react";
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
+import { useSelector } from "react-redux";
+import { RootState } from "../../src/redux/store";
+import { tokenStorage } from "../../src/utils/tokenStorage";
 export default function HomeScreen() {
+  const [user, setUser] = useState<any>(null);
+  useEffect(() => {
+    const getUser = async () => {
+      const user = await tokenStorage.getUser();
+      setUser(user);
+    }
+    getUser();
+  }, []);
+  console.log(user);
   return (
     <ScrollView style={styles.container}>
       {/* Hero Section */}
@@ -13,7 +24,7 @@ export default function HomeScreen() {
           style={styles.heroImage}
         />
         <View style={styles.heroOverlay}>
-          <Text style={styles.heroTitle}>Welcome to MyApp</Text>
+          <Text style={styles.heroTitle}>Welcome {user?.first_name} to MyApp</Text>
           <Text style={styles.heroSubtitle}>Discover amazing features</Text>
         </View>
       </View>

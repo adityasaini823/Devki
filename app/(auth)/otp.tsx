@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
-import authService from '../../src/services/authService';
+import { useVerifyOTPMutation, useSendLoginOTPMutation } from '../../src/redux/api/authApi';
+import { tokenStorage } from '../../src/utils/tokenStorage';
 
 export default function Otp() {
     const router = useRouter();
@@ -25,8 +26,10 @@ export default function Otp() {
     const cleanedPhone = params.phone ? (params.phone as string).replace(/\D/g, '') : '';
     
     const [otp, setOtp] = useState(['', '', '', '']);
-    const [loading, setLoading] = useState(false);
     const inputRefs = useRef<(TextInput | null)[]>([]);
+    
+    const [verifyOTP, { isLoading: isVerifying }] = useVerifyOTPMutation();
+    const [sendLoginOTP, { isLoading: isResending }] = useSendLoginOTPMutation();
     
     const handleOtpChange = (text: string, index: number) => {
         // Only allow numbers
@@ -86,33 +89,31 @@ export default function Otp() {
         }
         
         Keyboard.dismiss();
-        setLoading(true);
         
         try {
-            const response = await authService.verifyOTP(cleanedPhone, otpCode);
+            const response = await verifyOTP({ mobile: cleanedPhone, otp: otpCode }).unwrap();
             
-            if (response.success) {
-                // Check if profile needs to be completed
-                if (response.needsProfile) {
-                    // Navigate to signup details with phone number
-                    router.push({
-                        pathname: '/(auth)/signup-details',
-                        params: { phone: cleanedPhone },
-                    });
-                } else {
-                    // Profile is complete, navigate to home
-                    router.replace('/(tabs)');
-                }
+            if (response.needsProfile) {
+                router.push({
+                    pathname: '/(auth)/signup-details',
+                    params: { phone: cleanedPhone },
+                });
             } else {
-                Alert.alert('Error', response.message || 'OTP verification failed. Please try again.');
+                // Store token and user data for existing users
+                if (response.token) {
+                    await tokenStorage.saveToken(response.token);
+                }
+                if (response.user) {
+                    await tokenStorage.saveUser(response.user);
+                }
+                
+                router.replace('/(tabs)');
             }
         } catch (error: any) {
             Alert.alert(
                 'Verification Failed',
-                error.message || 'Invalid OTP. Please check and try again.'
+                error?.data?.message || error?.message || 'Invalid OTP. Please check and try again.'
             );
-        } finally {
-            setLoading(false);
         }
     };
     
@@ -123,16 +124,11 @@ export default function Otp() {
         }
         
         try {
-            const response = await authService.sendLoginOTP(cleanedPhone);
-            if (response.success) {
-                Alert.alert('Success', 'OTP has been resent to ' + phoneNumber);
-                // Clear current OTP
-                setOtp(['', '', '', '']);
-            } else {
-                Alert.alert('Error', response.message || 'Failed to resend OTP. Please try again.');
-            }
+            await sendLoginOTP({ mobile: cleanedPhone }).unwrap();
+            Alert.alert('Success', 'OTP has been resent to ' + phoneNumber);
+            setOtp(['', '', '', '']);
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to resend OTP. Please try again.');
+            Alert.alert('Error', error?.data?.message || error?.message || 'Failed to resend OTP. Please try again.');
         }
     };
     
@@ -170,13 +166,13 @@ export default function Otp() {
                 style={[
                     styles.verifyButton,
                     {
-                        backgroundColor: (otp.join('').length === 4 && !loading) ? '#8B5CF6' : '#D1D5DB',
+                        backgroundColor: (otp.join('').length === 4 && !isVerifying) ? '#8B5CF6' : '#D1D5DB',
                     }
                 ]}
                 onPress={handleVerify}
-                disabled={otp.join('').length !== 4 || loading}
+                disabled={otp.join('').length !== 4 || isVerifying}
             >
-                {loading ? (
+                {isVerifying ? (
                     <ActivityIndicator color="#FFFFFF" />
                 ) : (
                     <Text style={styles.verifyButtonText}>Verify & Proceed</Text>

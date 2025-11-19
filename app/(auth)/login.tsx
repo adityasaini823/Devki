@@ -15,13 +15,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
-import authService from '../../src/services/authService';
+import { useSendLoginOTPMutation } from '../../src/redux/api/authApi';
 
 export default function Login() {
     const router = useRouter();
     const { theme } = useTheme();
     const [mobileNumber, setMobileNumber] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [sendLoginOTP, { isLoading }] = useSendLoginOTPMutation();
     
     const formatPhoneNumber = (text: string) => {
         // Remove all non-digits
@@ -60,26 +60,19 @@ export default function Login() {
         }
 
         Keyboard.dismiss();
-        setLoading(true);
 
         try {
-            const response = await authService.sendLoginOTP(cleanedNumber);
+            const response = await sendLoginOTP({ mobile: cleanedNumber }).unwrap();
             
-            if (response.success) {
-                // Navigate to OTP screen with phone number
-                router.push({
-                    pathname: '/(auth)/otp',
-                    params: { 
-                        phone: cleanedNumber,
-                    },
-                });
-            } else {
-                Alert.alert('Error', response.message || 'Failed to send OTP. Please try again.');
-            }
+            router.push({
+                pathname: '/(auth)/otp',
+                params: { 
+                    phone: cleanedNumber,
+                },
+            });
         } catch (error: any) {
-            const errorMessage = error.message || 'Failed to send OTP. Please check your connection and try again.';
+            const errorMessage = error?.data?.message || error?.message || 'Failed to send OTP. Please check your connection and try again.';
             
-            // Show detailed error message
             Alert.alert(
                 'Connection Error', 
                 errorMessage,
@@ -90,8 +83,6 @@ export default function Login() {
                     }
                 ]
             );
-        } finally {
-            setLoading(false);
         }
     };
     
@@ -141,13 +132,13 @@ export default function Login() {
                             style={[
                                 styles.button,
                                 {
-                                    backgroundColor: (isValid && !loading) ? '#8B5CF6' : '#D1D5DB',
+                                    backgroundColor: (isValid && !isLoading) ? '#8B5CF6' : '#D1D5DB',
                                 }
                             ]}
                             onPress={handleLogin}
-                            disabled={!isValid || loading}
+                            disabled={!isValid || isLoading}
                         >
-                            {loading ? (
+                            {isLoading ? (
                                 <ActivityIndicator color="#FFFFFF" />
                             ) : (
                                 <Text style={styles.buttonText}>Get OTP</Text>

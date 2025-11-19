@@ -13,11 +13,13 @@ import {
     ActivityIndicator,
     Alert,
     Animated,
+    Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
 import { Ionicons } from '@expo/vector-icons';
-import authService from '../../src/services/authService';
+import { useCompleteProfileMutation } from '../../src/redux/api/authApi';
+import { tokenStorage } from '../../src/utils/tokenStorage';
 
 interface InputFieldProps {
     icon: keyof typeof Ionicons.glyphMap;
@@ -135,7 +137,12 @@ export default function SignupDetails() {
     const [city, setCity] = useState('');
     const [state, setState] = useState('');
     const [pincode, setPincode] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+    
+    const [completeProfile, { isLoading }] = useCompleteProfileMutation();
+    
+    const scaleAnim = useRef(new Animated.Value(0)).current;
+    const checkmarkAnim = useRef(new Animated.Value(0)).current;
     
     const firstNameRef = useRef<TextInput>(null);
     const lastNameRef = useRef<TextInput>(null);
@@ -175,10 +182,9 @@ export default function SignupDetails() {
         }
         
         Keyboard.dismiss();
-        setLoading(true);
         
         try {
-            const response = await authService.completeProfile({
+            const response = await completeProfile({
                 mobile: phoneNumber.replace(/\D/g, ''),
                 first_name: firstName.trim(),
                 last_name: lastName.trim() || undefined,
@@ -187,20 +193,43 @@ export default function SignupDetails() {
                 city: city.trim(),
                 state: state.trim(),
                 pincode: pincode.trim(),
-            });
+            }).unwrap();
             
-            if (response.success && response.token) {
-                router.replace('/(tabs)');
-            } else {
-                Alert.alert('Error', response.message || 'Failed to complete profile. Please try again.');
+            // Store token and user data
+            if (response.token) {
+                await tokenStorage.saveToken(response.token);
             }
+            if (response.user) {
+                await tokenStorage.saveUser(response.user);
+            }
+            
+            // Show success confirmation
+            setShowSuccess(true);
+            
+            // Animate success modal
+            Animated.sequence([
+                Animated.spring(scaleAnim, {
+                    toValue: 1,
+                    useNativeDriver: true,
+                    tension: 50,
+                    friction: 7,
+                }),
+                Animated.timing(checkmarkAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+            
+            // Navigate to home after 2 seconds
+            setTimeout(() => {
+                router.replace('/(tabs)');
+            }, 2000);
         } catch (error: any) {
             Alert.alert(
                 'Error',
-                error.message || 'Failed to complete profile. Please check your connection and try again.'
+                error?.data?.message || error?.message || 'Failed to complete profile. Please check your connection and try again.'
             );
-        } finally {
-            setLoading(false);
         }
     };
     
@@ -371,13 +400,13 @@ export default function SignupDetails() {
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
-                                isFormValid() && !loading && styles.submitButtonActive,
+                                isFormValid() && !isLoading && styles.submitButtonActive,
                             ]}
                             onPress={handleSubmit}
-                            disabled={!isFormValid() || loading}
+                            disabled={!isFormValid() || isLoading}
                             activeOpacity={0.8}
                         >
-                            {loading ? (
+                            {isLoading ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <>
@@ -392,6 +421,53 @@ export default function SignupDetails() {
                         </Text>
                     </View>
                 </ScrollView>
+                
+                {/* Success Confirmation Modal */}
+                <Modal
+                    visible={showSuccess}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => {}}
+                >
+                    <View style={styles.modalOverlay}>
+                        <Animated.View
+                            style={[
+                                styles.successContainer,
+                                {
+                                    transform: [{ scale: scaleAnim }],
+                                },
+                            ]}
+                        >
+                            <Animated.View
+                                style={[
+                                    styles.checkmarkCircle,
+                                    {
+                                        opacity: checkmarkAnim,
+                                        transform: [
+                                            {
+                                                scale: checkmarkAnim.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [0.5, 1],
+                                                }),
+                                            },
+                                        ],
+                                    },
+                                ]}
+                            >
+                                <Ionicons name="checkmark" size={60} color="#FFFFFF" />
+                            </Animated.View>
+                            
+                            <Text style={styles.successTitle}>Profile Created!</Text>
+                            <Text style={styles.successMessage}>
+                                Your profile has been successfully created. Welcome to Devki!
+                            </Text>
+                            
+                            <View style={styles.successLoader}>
+                                <ActivityIndicator size="small" color="#8B5CF6" />
+                            </View>
+                        </Animated.View>
+                    </View>
+                </Modal>
             </View>
         </KeyboardAvoidingView>
     );
@@ -599,5 +675,50 @@ const styles = StyleSheet.create({
         color: '#9CA3AF',
         textAlign: 'center',
         lineHeight: 18,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    successContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 32,
+        alignItems: 'center',
+        width: '85%',
+        maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    checkmarkCircle: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#10B981',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    successTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    successMessage: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 24,
+    },
+    successLoader: {
+        marginTop: 8,
     },
 });
