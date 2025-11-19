@@ -195,9 +195,12 @@ export default function SignupDetails() {
                 pincode: pincode.trim(),
             }).unwrap();
             
-            // Store token and user data
+            // Store tokens and user data
             if (response.token) {
                 await tokenStorage.saveToken(response.token);
+            }
+            if (response.refreshToken) {
+                await tokenStorage.saveRefreshToken(response.refreshToken);
             }
             if (response.user) {
                 await tokenStorage.saveUser(response.user);

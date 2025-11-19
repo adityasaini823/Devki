@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, ActivityIndicator, Alert, Modal, Animated } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
+import { Ionicons } from '@expo/vector-icons';
 import { useVerifyOTPMutation, useSendLoginOTPMutation } from '../../src/redux/api/authApi';
 import { tokenStorage } from '../../src/utils/tokenStorage';
 
@@ -27,9 +28,13 @@ export default function Otp() {
     
     const [otp, setOtp] = useState(['', '', '', '']);
     const inputRefs = useRef<(TextInput | null)[]>([]);
+    const [showSuccess, setShowSuccess] = useState(false);
     
     const [verifyOTP, { isLoading: isVerifying }] = useVerifyOTPMutation();
     const [sendLoginOTP, { isLoading: isResending }] = useSendLoginOTPMutation();
+    
+    const scaleAnim = useRef(new Animated.Value(0)).current;
+    const checkmarkAnim = useRef(new Animated.Value(0)).current;
     
     const handleOtpChange = (text: string, index: number) => {
         // Only allow numbers
@@ -99,15 +104,39 @@ export default function Otp() {
                     params: { phone: cleanedPhone },
                 });
             } else {
-                // Store token and user data for existing users
+                // Store tokens and user data for existing users
                 if (response.token) {
                     await tokenStorage.saveToken(response.token);
+                }
+                if (response.refreshToken) {
+                    await tokenStorage.saveRefreshToken(response.refreshToken);
                 }
                 if (response.user) {
                     await tokenStorage.saveUser(response.user);
                 }
                 
-                router.replace('/(tabs)');
+                // Show success confirmation
+                setShowSuccess(true);
+                
+                // Animate success modal
+                Animated.sequence([
+                    Animated.spring(scaleAnim, {
+                        toValue: 1,
+                        useNativeDriver: true,
+                        tension: 50,
+                        friction: 7,
+                    }),
+                    Animated.timing(checkmarkAnim, {
+                        toValue: 1,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+                
+                // Navigate to home after 2 seconds
+                setTimeout(() => {
+                    router.replace('/(tabs)');
+                }, 2000);
             }
         } catch (error: any) {
             Alert.alert(
@@ -187,6 +216,53 @@ export default function Otp() {
                     </Text>
                 </TouchableOpacity>
             </View>
+            
+            {/* Success Confirmation Modal */}
+            <Modal
+                visible={showSuccess}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {}}
+            >
+                <View style={styles.modalOverlay}>
+                    <Animated.View
+                        style={[
+                            styles.successContainer,
+                            {
+                                transform: [{ scale: scaleAnim }],
+                            },
+                        ]}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.checkmarkCircle,
+                                {
+                                    opacity: checkmarkAnim,
+                                    transform: [
+                                        {
+                                            scale: checkmarkAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0.5, 1],
+                                            }),
+                                        },
+                                    ],
+                                },
+                            ]}
+                        >
+                            <Ionicons name="checkmark" size={60} color="#FFFFFF" />
+                        </Animated.View>
+                        
+                        <Text style={styles.successTitle}>Login Successful!</Text>
+                        <Text style={styles.successMessage}>
+                            Welcome back! You've been successfully logged in.
+                        </Text>
+                        
+                        <View style={styles.successLoader}>
+                            <ActivityIndicator size="small" color="#8B5CF6" />
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -253,5 +329,50 @@ const styles = StyleSheet.create({
     resendLink: {
         fontSize: 14,
         fontWeight: '600',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    successContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 32,
+        alignItems: 'center',
+        width: '85%',
+        maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    checkmarkCircle: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#10B981',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    successTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    successMessage: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 24,
+    },
+    successLoader: {
+        marginTop: 8,
     },
 });

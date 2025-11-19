@@ -30,10 +30,43 @@ const baseQuery = fetchBaseQuery({
 });
 
 const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
-  const result = await baseQuery(args, api, extraOptions);
+  let result = await baseQuery(args, api, extraOptions);
   
   if (result.error && (result.error as ApiError).status === 401) {
-    // TODO: Handle token refresh or logout
+    // Try to refresh the token
+    const refreshToken = await tokenStorage.getRefreshToken();
+    
+    if (refreshToken) {
+      try {
+        // Call refresh token endpoint
+        const refreshResult = await fetch(`${API_CONFIG.BASE_URL}/auth/refresh-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        const refreshData = await refreshResult.json();
+
+        if (refreshData.success && refreshData.token) {
+          // Save new access token
+          await tokenStorage.saveToken(refreshData.token);
+          
+          // Retry the original request with new token
+          result = await baseQuery(args, api, extraOptions);
+        } else {
+          // Refresh failed, clear tokens and logout
+          await tokenStorage.removeToken();
+        }
+      } catch (error) {
+        // Refresh failed, clear tokens
+        await tokenStorage.removeToken();
+      }
+    } else {
+      // No refresh token, clear everything
+      await tokenStorage.removeToken();
+    }
   }
   
   return result;

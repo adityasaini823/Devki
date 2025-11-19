@@ -17,6 +17,7 @@ export interface VerifyOTPRequest {
 
 export interface VerifyOTPResponse extends ApiResponse {
   token?: string;
+  refreshToken?: string;
   user?: {
     id: string;
     mobile: string;
@@ -44,6 +45,7 @@ export interface CompleteProfileRequest {
 
 export interface CompleteProfileResponse extends ApiResponse {
   token: string;
+  refreshToken: string;
   user: {
     id: string;
     mobile: string;
@@ -55,6 +57,14 @@ export interface CompleteProfileResponse extends ApiResponse {
     state: string;
     pincode: string;
   };
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse extends ApiResponse {
+  token: string;
 }
 
 export const authApi = baseApi.injectEndpoints({
@@ -93,6 +103,22 @@ export const authApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['Auth', 'User'],
     }),
+
+    refreshToken: builder.mutation<RefreshTokenResponse, RefreshTokenRequest>({
+      query: (body) => ({
+        url: '/auth/refresh-token',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    logout: builder.mutation<ApiResponse, void>({
+      query: () => ({
+        url: '/auth/logout',
+        method: 'POST',
+      }),
+      invalidatesTags: ['Auth', 'User'],
+    }),
   }),
 });
 
@@ -100,5 +126,7 @@ export const {
   useSendLoginOTPMutation,
   useVerifyOTPMutation,
   useCompleteProfileMutation,
+  useRefreshTokenMutation,
+  useLogoutMutation,
 } = authApi;
 

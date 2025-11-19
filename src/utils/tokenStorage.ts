@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = '@auth_token';
+const REFRESH_TOKEN_KEY = '@refresh_token';
 const USER_KEY = '@user_data';
 
 export const tokenStorage = {
@@ -22,9 +23,28 @@ export const tokenStorage = {
     }
   },
 
+  async saveRefreshToken(refreshToken: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    } catch (error) {
+      console.error('Error saving refresh token:', error);
+      throw error;
+    }
+  },
+
+  async getRefreshToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+    } catch (error) {
+      console.error('Error getting refresh token:', error);
+      return null;
+    }
+  },
+
   async removeToken(): Promise<void> {
     try {
       await AsyncStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
       await AsyncStorage.removeItem(USER_KEY);
     } catch (error) {
       console.error('Error removing token:', error);
