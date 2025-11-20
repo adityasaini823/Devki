@@ -9,15 +9,19 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    TouchableWithoutFeedback
+    TouchableWithoutFeedback,
+    ActivityIndicator,
+    Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
+import { useSendLoginOTPMutation } from '../../src/redux/api/authApi';
 
 export default function Login() {
     const router = useRouter();
     const { theme } = useTheme();
     const [mobileNumber, setMobileNumber] = useState('');
+    const [sendLoginOTP, { isLoading }] = useSendLoginOTPMutation();
     
     const formatPhoneNumber = (text: string) => {
         // Remove all non-digits
@@ -48,16 +52,37 @@ export default function Login() {
         }
     };
     
-    const handleLogin = () => {
+    const handleLogin = async () => {
         const cleanedNumber = mobileNumber.replace(/\D/g, '');
-        if (cleanedNumber.length === 10) {
-            Keyboard.dismiss();
+        if (cleanedNumber.length !== 10) {
+            Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number');
+            return;
+        }
+
+        Keyboard.dismiss();
+
+        try {
+            const response = await sendLoginOTP({ mobile: cleanedNumber }).unwrap();
+            
             router.push({
-                pathname: '/otp',
-                params: { phone: cleanedNumber },
+                pathname: '/(auth)/otp',
+                params: { 
+                    phone: cleanedNumber,
+                },
             });
-        } else {
-            alert('Please enter a valid 10-digit mobile number');
+        } catch (error: any) {
+            const errorMessage = error?.data?.message || error?.message || 'Failed to send OTP. Please check your connection and try again.';
+            
+            Alert.alert(
+                'Connection Error', 
+                errorMessage,
+                [
+                    {
+                        text: 'OK',
+                        style: 'default'
+                    }
+                ]
+            );
         }
     };
     
@@ -107,13 +132,17 @@ export default function Login() {
                             style={[
                                 styles.button,
                                 {
-                                    backgroundColor: isValid ? '#8B5CF6' : '#D1D5DB',
+                                    backgroundColor: (isValid && !isLoading) ? '#8B5CF6' : '#D1D5DB',
                                 }
                             ]}
                             onPress={handleLogin}
-                            disabled={!isValid}
+                            disabled={!isValid || isLoading}
                         >
-                            <Text style={styles.buttonText}>Get OTP</Text>
+                            {isLoading ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.buttonText}>Get OTP</Text>
+                            )}
                         </TouchableOpacity>
                         
                         <Text style={[styles.termsText, { color: theme.colors.muted }]}>
