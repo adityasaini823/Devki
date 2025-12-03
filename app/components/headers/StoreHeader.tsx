@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../_theme/ThemeProvider';
 
 export default function StoreHeader() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
+    <View style={[styles.header, { backgroundColor: theme.colors.primary, paddingTop: insets.top }]}>
       <Text style={styles.headerTitle}>Store</Text>
       <TouchableOpacity onPress={() => alert('Cart pressed')}>
         <Ionicons name="cart" size={24} color="#fff" />
@@ -18,12 +20,12 @@ export default function StoreHeader() {
 
 const styles = StyleSheet.create({
   header: {
-    height: 60,
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: 24,
+    paddingBottom: 8,
   },
   headerTitle: {
     fontSize: 20,
