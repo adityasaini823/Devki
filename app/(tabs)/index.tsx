@@ -12,7 +12,6 @@ export default function HomeScreen() {
     }
     getUser();
   }, []);
-  console.log(user);
   return (
     <ScrollView style={styles.container}>
       {/* Hero Section */}
