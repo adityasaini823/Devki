@@ -3,7 +3,10 @@ import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 import { useSelector } from "react-redux";
 import { RootState } from "../../src/redux/store";
 import { tokenStorage } from "../../src/utils/tokenStorage";
+import { useTheme } from "../_theme/ThemeProvider";
+
 export default function HomeScreen() {
+  const { theme } = useTheme();
   const [user, setUser] = useState<any>(null);
   useEffect(() => {
     const getUser = async () => {
@@ -13,7 +16,7 @@ export default function HomeScreen() {
     getUser();
   }, []);
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Hero Section */}
       <View style={styles.heroContainer}>
         <Image
@@ -28,18 +31,18 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Recommended for you</Text>
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recommended for you</Text>
 
       {/* Cards Section */}
       <View style={styles.cardGrid}>
         {[1, 2, 3, 4].map((item) => (
-          <TouchableOpacity key={item} style={styles.card}>
+          <TouchableOpacity key={item} style={[styles.card, { backgroundColor: theme.colors.card }]}>
             <Image
               source={{ uri: `https://picsum.photos/200/200?random=${item}` }}
               style={styles.cardImage}
             />
-            <Text style={styles.cardTitle}>Item {item}</Text>
-            <Text style={styles.cardDescription}>Some quick description</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Item {item}</Text>
+            <Text style={[styles.cardDescription, { color: theme.colors.muted }]}>Some quick description</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -50,7 +53,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     container: {
     flex: 1,
-    backgroundColor: "#f4f4f4",
   },
   heroContainer: {
     position: "relative",
@@ -91,7 +93,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   card: {
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 10,
     marginBottom: 16,
@@ -114,6 +115,5 @@ const styles = StyleSheet.create({
   },
   cardDescription: {
     fontSize: 12,
-    color: "#555",
   },
 });

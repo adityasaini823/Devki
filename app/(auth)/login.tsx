@@ -132,7 +132,7 @@ export default function Login() {
                             style={[
                                 styles.button,
                                 {
-                                    backgroundColor: (isValid && !isLoading) ? '#8B5CF6' : '#D1D5DB',
+                                    backgroundColor: (isValid && !isLoading) ? theme.colors.primary : '#D1D5DB',
                                 }
                             ]}
                             onPress={handleLogin}

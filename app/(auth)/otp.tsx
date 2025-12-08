@@ -195,7 +195,7 @@ export default function Otp() {
                 style={[
                     styles.verifyButton,
                     {
-                        backgroundColor: (otp.join('').length === 4 && !isVerifying) ? '#8B5CF6' : '#D1D5DB',
+                        backgroundColor: (otp.join('').length === 4 && !isVerifying) ? theme.colors.primary : '#D1D5DB',
                     }
                 ]}
                 onPress={handleVerify}
@@ -258,7 +258,7 @@ export default function Otp() {
                         </Text>
                         
                         <View style={styles.successLoader}>
-                            <ActivityIndicator size="small" color="#8B5CF6" />
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
                         </View>
                     </Animated.View>
                 </View>

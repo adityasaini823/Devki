@@ -57,7 +57,7 @@ export default function RootLayout() {
               size={24}
             />
           ),
-          headerShown: true,
+          headerShown: false, // Hide default header since we have custom header
         }}
       />
       <Tabs.Screen

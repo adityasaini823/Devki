@@ -78,18 +78,27 @@ const ModernInput: React.FC<InputFieldProps> = ({
 
     return (
         <Animated.View style={[styles.inputContainer, { transform: [{ scale: scaleAnim }] }]}>
-            <View style={[styles.inputWrapper, isFocused && styles.inputWrapperFocused]}>
+            <View style={[
+                styles.inputWrapper, 
+                isFocused && [
+                    styles.inputWrapperFocused,
+                    {
+                        borderColor: theme.colors.primary,
+                        shadowColor: theme.colors.primary,
+                    }
+                ]
+            ]}>
                 <View style={styles.iconContainer}>
                     <Ionicons
                         name={icon}
                         size={20}
-                        color={isFocused ? '#8B5CF6' : '#9CA3AF'}
+                        color={isFocused ? theme.colors.primary : '#9CA3AF'}
                     />
                 </View>
                 <View style={styles.inputContent}>
                     {showLabel && (
                         <Animated.View style={styles.floatingLabel}>
-                            <Text style={styles.floatingLabelText}>
+                            <Text style={[styles.floatingLabelText, { color: theme.colors.primary }]}>
                                 {label} {required && <Text style={styles.required}>*</Text>}
                             </Text>
                         </Animated.View>
@@ -263,7 +272,7 @@ export default function SignupDetails() {
                     
                     <View style={styles.progressContainer}>
                         <View style={styles.progressBar}>
-                            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                            <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.colors.primary }]} />
                         </View>
                         <Text style={styles.progressText}>
                             {completedFields} of 5 fields completed
@@ -280,7 +289,7 @@ export default function SignupDetails() {
                         {/* Welcome Section */}
                         <View style={styles.welcomeSection}>
                             <View style={styles.avatarContainer}>
-                                <Ionicons name="person" size={40} color="#8B5CF6" />
+                                <Ionicons name="person" size={40} color={theme.colors.primary} />
                             </View>
                             <Text style={styles.welcomeTitle}>Let's get you set up!</Text>
                             <Text style={styles.welcomeSubtitle}>
@@ -291,7 +300,7 @@ export default function SignupDetails() {
                         {/* Personal Info Card */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
-                                <Ionicons name="person-circle-outline" size={24} color="#8B5CF6" />
+                                <Ionicons name="person-circle-outline" size={24} color={theme.colors.primary} />
                                 <Text style={styles.cardTitle}>Personal Information</Text>
                             </View>
                             
@@ -335,7 +344,7 @@ export default function SignupDetails() {
                         {/* Address Info Card */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
-                                <Ionicons name="location-outline" size={24} color="#8B5CF6" />
+                                <Ionicons name="location-outline" size={24} color={theme.colors.primary} />
                                 <Text style={styles.cardTitle}>Delivery Address</Text>
                             </View>
                             
@@ -403,7 +412,13 @@ export default function SignupDetails() {
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
-                                isFormValid() && !isLoading && styles.submitButtonActive,
+                                isFormValid() && !isLoading && [
+                                    styles.submitButtonActive,
+                                    {
+                                        backgroundColor: theme.colors.primary,
+                                        shadowColor: theme.colors.primary,
+                                    }
+                                ],
                             ]}
                             onPress={handleSubmit}
                             disabled={!isFormValid() || isLoading}
@@ -466,7 +481,7 @@ export default function SignupDetails() {
                             </Text>
                             
                             <View style={styles.successLoader}>
-                                <ActivityIndicator size="small" color="#8B5CF6" />
+                                <ActivityIndicator size="small" color={theme.colors.primary} />
                             </View>
                         </Animated.View>
                     </View>
@@ -526,7 +541,6 @@ const styles = StyleSheet.create({
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#8B5CF6',
         borderRadius: 3,
     },
     progressText: {
@@ -605,9 +619,7 @@ const styles = StyleSheet.create({
         minHeight: 56,
     },
     inputWrapperFocused: {
-        borderColor: '#8B5CF6',
         backgroundColor: '#FFFFFF',
-        shadowColor: '#8B5CF6',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -626,7 +638,6 @@ const styles = StyleSheet.create({
     floatingLabelText: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#8B5CF6',
     },
     required: {
         color: '#EF4444',
@@ -661,8 +672,6 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     submitButtonActive: {
-        backgroundColor: '#8B5CF6',
-        shadowColor: '#8B5CF6',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,

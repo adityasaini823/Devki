@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,21 @@ import {
   ScrollView,
   TouchableOpacity,
   Pressable,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../_theme/ThemeProvider';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  useGetSubscriptionQuery,
+  useCreateOrUpdateSubscriptionMutation,
+} from '../../src/redux/api/subscriptionApi';
+import {
+  useGetSubscriptionProductsQuery,
+} from '../../src/redux/api/subscriptionProductApi';
 
-const MILK_OPTIONS = [
-  { quantity: '1L', price: 4.99 },
-  { quantity: '2L', price: 8.99 },
-  { quantity: '3L', price: 12.99 },
-  { quantity: '5L', price: 19.99 },
-];
+// Keep these as constants since they're UI options, not from DB
 
 const DELIVERY_TIMES = [
   { label: 'Morning (6-8 AM)', value: 'morning', icon: 'sunny' },
@@ -55,28 +59,116 @@ const darkenColor = (color) => {
 
 export default function Subscription() {
   const { theme } = useTheme();
-  const [selectedQuantity, setSelectedQuantity] = useState('2L');
+  const insets = useSafeAreaInsets();
+  
+  // Fetch subscription products from API
+  const { data: productsData, isLoading: isLoadingProducts } = useGetSubscriptionProductsQuery();
+  // Fetch existing subscription
+  const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionQuery();
+  const [createOrUpdateSubscription, { isLoading: isSaving }] = useCreateOrUpdateSubscriptionMutation();
+
+  const [selectedProductId, setSelectedProductId] = useState(null);
   const [selectedTime, setSelectedTime] = useState('morning');
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
 
-  const selectedMilkOption = MILK_OPTIONS.find(opt => opt.quantity === selectedQuantity);
+  // Get products array
+  const products = productsData?.products || [];
+
+  // Load existing subscription data when available
+  useEffect(() => {
+    if (subscriptionData?.subscription) {
+      const sub = subscriptionData.subscription;
+      setSelectedProductId(sub.subscription_product.id);
+      setSelectedTime(sub.delivery_time);
+      setSelectedFrequency(sub.frequency);
+    } else if (products.length > 0 && !selectedProductId) {
+      // Set default to first product if no subscription exists
+      setSelectedProductId(products[0].id);
+    }
+  }, [subscriptionData, products]);
+
+  const selectedProduct = products.find(p => p.id === selectedProductId);
   const selectedFreqOption = FREQUENCY_OPTIONS.find(opt => opt.value === selectedFrequency);
 
   const monthlyEstimate = useMemo(() => {
-    if (!selectedMilkOption || !selectedFreqOption) return 0;
-    return selectedMilkOption.price * selectedFreqOption.deliveriesPerMonth;
-  }, [selectedMilkOption, selectedFreqOption]);
+    if (!selectedProduct || !selectedFreqOption) return 0;
+    return selectedProduct.price_per_delivery * selectedFreqOption.deliveriesPerMonth;
+  }, [selectedProduct, selectedFreqOption]);
 
   // Create light tint of primary color for selected backgrounds
   const selectedBgColor = lightenColor(theme.colors.primary, 0.15);
 
+  // Handle checkout/save subscription
+  const handleCheckout = async () => {
+    if (!selectedProductId) {
+      Alert.alert('Error', 'Please select a milk quantity');
+      return;
+    }
+
+    try {
+      const result = await createOrUpdateSubscription({
+        subscription_product_id: selectedProductId,
+        delivery_time: selectedTime,
+        frequency: selectedFrequency,
+      }).unwrap();
+
+      if (result.success) {
+        Alert.alert(
+          'Success',
+          subscriptionData?.subscription 
+            ? 'Subscription updated successfully!' 
+            : 'Subscription created successfully!',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (err) {
+      let errorMessage = 'Failed to save subscription. Please try again.';
+      
+      if (err && typeof err === 'object') {
+        if ('data' in err && err.data && typeof err.data === 'object' && 'message' in err.data) {
+          errorMessage = err.data.message;
+        } else if ('message' in err) {
+          errorMessage = err.message;
+        }
+      }
+      
+      Alert.alert(
+        'Error',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Custom Header - matching store header style */}
+      <View style={[styles.header, { backgroundColor: theme.colors.primary, paddingTop: insets.top }]}>
+        <Text style={styles.headerTitle}>Subscriptions</Text>
+        <TouchableOpacity onPress={() => alert('Subscription info')}>
+          <Ionicons name="information-circle-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {(isLoadingSubscription || isLoadingProducts) ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.muted }]}>
+            Loading...
+          </Text>
+        </View>
+      ) : products.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: theme.colors.muted }]}>
+            No subscription products available
+          </Text>
+        </View>
+      ) : (
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Milk Quantity Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -87,11 +179,13 @@ export default function Subscription() {
           </Text>
           
           <View style={styles.quantityGrid}>
-            {MILK_OPTIONS.map((option) => {
-              const isSelected = selectedQuantity === option.quantity;
+            {products && products.length > 0 && products.map((product, index) => {
+              const isSelected = selectedProductId === product.id;
+              // Use quantity as key since it's unique, fallback to index if needed
+              const uniqueKey = product.quantity || `product-${index}`;
               return (
                 <TouchableOpacity
-                  key={option.quantity}
+                  key={uniqueKey}
                   style={[
                     styles.quantityCard,
                     isSelected && styles.quantityCardSelected,
@@ -100,7 +194,7 @@ export default function Subscription() {
                       borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
                     },
                   ]}
-                  onPress={() => setSelectedQuantity(option.quantity)}
+                  onPress={() => setSelectedProductId(product.id)}
                   activeOpacity={0.7}
                 >
                   <Text
@@ -112,7 +206,7 @@ export default function Subscription() {
                       },
                     ]}
                   >
-                    {option.quantity}
+                    {product.quantity}
                   </Text>
                   <Text
                     style={[
@@ -122,7 +216,7 @@ export default function Subscription() {
                       },
                     ]}
                   >
-                    ${option.price.toFixed(2)}/day
+                    ₹{product.price_per_delivery.toFixed(0)}/day
                   </Text>
                 </TouchableOpacity>
               );
@@ -269,7 +363,7 @@ export default function Subscription() {
               Price per delivery:
             </Text>
             <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              ${selectedMilkOption?.price.toFixed(2) || '0.00'}
+              ₹{selectedProduct?.price_per_delivery.toFixed(0) || '0'}
             </Text>
           </View>
           <View style={styles.summaryRow}>
@@ -286,30 +380,59 @@ export default function Subscription() {
               Monthly estimate:
             </Text>
             <Text style={[styles.summaryValue, styles.summaryValueBold, { color: theme.colors.primary }]}>
-              ${monthlyEstimate.toFixed(2)}
+              ₹{monthlyEstimate.toFixed(0)}
             </Text>
           </View>
         </View>
 
         {/* Checkout Button */}
         <Pressable
-          style={[styles.checkoutButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => alert('Proceeding to checkout...')}
+          style={[
+            styles.checkoutButton, 
+            { 
+              backgroundColor: theme.colors.primary,
+              opacity: isSaving ? 0.7 : 1,
+            }
+          ]}
+          onPress={handleCheckout}
+          disabled={isSaving}
           android_ripple={{ color: darkenColor(theme.colors.primary) }}
         >
-          <Ionicons name="cart" size={20} color="#fff" style={styles.checkoutIcon} />
-          <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+          {isSaving ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons name="cart" size={20} color="#fff" style={styles.checkoutIcon} />
+              <Text style={styles.checkoutButtonText}>
+                {subscriptionData?.subscription ? 'Update Subscription' : 'Proceed to Checkout'}
+              </Text>
+            </>
+          )}
         </Pressable>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-    </SafeAreaView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   scrollView: {
     flex: 1,
@@ -466,5 +589,15 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
   },
 });

@@ -28,12 +28,12 @@ export default function Store() {
         columnWrapperStyle={styles.columnWrapper}
         renderItem={({ item }) => (
           <View style={styles.cardWrapper}>
-            <TouchableOpacity style={styles.card} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.card }]} activeOpacity={0.8}>
               <Image source={{ uri: `https://picsum.photos/200/200?random=${item}` }} style={styles.cardImage} />
-              <Text style={styles.cardTitle}>Desi Ghee {item}</Text>
-              <Text style={styles.cardDescription}>Home Made Ghee - 500ml</Text>
+              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Desi Ghee {item}</Text>
+              <Text style={[styles.cardDescription, { color: theme.colors.muted }]}>Home Made Ghee - 500ml</Text>
               <View>
-                <Text style={styles.price}>₹ 500</Text>
+                <Text style={[styles.price, { color: theme.colors.text }]}>₹ 500</Text>
               </View>
               <Pressable style={[styles.cartButton, { backgroundColor: theme.colors.primary }]} onPress={() => alert(`Buying item ${item}`)}>
                 <Text style={styles.cartButtonText}>Add To Cart</Text>
@@ -49,7 +49,6 @@ export default function Store() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f4f4',
   },
   sectionTitle: {
     fontSize: 20,
@@ -76,7 +75,6 @@ const styles = StyleSheet.create({
     margin: 10,
   },
   card: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 10,
     shadowColor: '#000',
@@ -99,7 +97,6 @@ const styles = StyleSheet.create({
   },
   cardDescription: {
     fontSize: 11,
-    color: '#555',
   },
   price: {
     fontSize: 14,
