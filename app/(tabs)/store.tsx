@@ -8,40 +8,143 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useTheme } from '../_theme/ThemeProvider';
+import { useGetProductsQuery } from '../../src/redux/api/productApi';
 
 export default function Store() {
-  const items = [1, 2, 3, 4, 5, 6];
-
   const { theme } = useTheme();
+  const { data: productsData, isLoading, isError, refetch, isFetching } = useGetProductsQuery();
+
+  const products = productsData?.products || [];
+
+  const handleAddToCart = (productId: string, productName: string) => {
+    alert(`Added ${productName} to cart!`);
+    // TODO: Implement cart functionality
+  };
+
+  if (isLoading) {
+    return (
+      <KeyboardAvoidingView 
+        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.muted }]}>
+            Loading products...
+          </Text>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <KeyboardAvoidingView 
+        style={[styles.container, { backgroundColor: theme.colors.background }]} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.errorText, { color: theme.colors.error || '#EF4444' }]}>
+            Failed to load products
+          </Text>
+          <Pressable 
+            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => refetch()}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
-    <KeyboardAvoidingView style={[styles.container, { backgroundColor: theme.colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text, }]}>Featured Products</Text>
-      <FlatList
-        data={items}
-        keyExtractor={(i) => `${i}`}
-        numColumns={2}
-        contentContainerStyle={styles.scrollContent}
-        columnWrapperStyle={styles.columnWrapper}
-        renderItem={({ item }) => (
-          <View style={styles.cardWrapper}>
-            <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.card }]} activeOpacity={0.8}>
-              <Image source={{ uri: `https://picsum.photos/200/200?random=${item}` }} style={styles.cardImage} />
-              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Desi Ghee {item}</Text>
-              <Text style={[styles.cardDescription, { color: theme.colors.muted }]}>Home Made Ghee - 500ml</Text>
-              <View>
-                <Text style={[styles.price, { color: theme.colors.text }]}>₹ 500</Text>
-              </View>
-              <Pressable style={[styles.cartButton, { backgroundColor: theme.colors.primary }]} onPress={() => alert(`Buying item ${item}`)}>
-                <Text style={styles.cartButtonText}>Add To Cart</Text>
-              </Pressable>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+    <KeyboardAvoidingView 
+      style={[styles.container, { backgroundColor: theme.colors.background }]} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        Featured Products {products.length > 0 && `(${products.length})`}
+      </Text>
+      {products.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
+            No products available
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={products}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={styles.scrollContent}
+          columnWrapperStyle={styles.columnWrapper}
+          refreshControl={
+            <RefreshControl
+              refreshing={isFetching}
+              onRefresh={refetch}
+              tintColor={theme.colors.primary}
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.cardWrapper}>
+              <TouchableOpacity 
+                style={[styles.card, { backgroundColor: theme.colors.card }]} 
+                activeOpacity={0.8}
+              >
+                <Image 
+                  source={{ uri: item.product_image || 'https://picsum.photos/200/200' }} 
+                  style={styles.cardImage}
+                  defaultSource={{ uri: 'https://via.placeholder.com/200' }}
+                />
+                <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                  {item.product_name}
+                </Text>
+                {item.description && (
+                  <Text style={[styles.cardDescription, { color: theme.colors.muted }]} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                )}
+                <View style={styles.priceContainer}>
+                  <Text style={[styles.price, { color: theme.colors.text }]}>
+                    ₹{item.product_price.toFixed(0)}
+                  </Text>
+                  {item.product_stock > 0 ? (
+                    <Text style={[styles.stockText, { color: theme.colors.muted }]}>
+                      In Stock
+                    </Text>
+                  ) : (
+                    <Text style={[styles.stockText, { color: theme.colors.error || '#EF4444' }]}>
+                      Out of Stock
+                    </Text>
+                  )}
+                </View>
+                <Pressable 
+                  style={[
+                    styles.cartButton, 
+                    { 
+                      backgroundColor: item.product_stock > 0 ? theme.colors.primary : '#D1D5DB',
+                      opacity: item.product_stock > 0 ? 1 : 0.6,
+                    }
+                  ]} 
+                  onPress={() => handleAddToCart(item.id, item.product_name)}
+                  disabled={item.product_stock === 0}
+                >
+                  <Text style={styles.cartButtonText}>
+                    {item.product_stock > 0 ? 'Add To Cart' : 'Out of Stock'}
+                  </Text>
+                </Pressable>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -115,5 +218,50 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  stockText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 });
