@@ -67,6 +67,47 @@ export interface RefreshTokenResponse extends ApiResponse {
   token: string;
 }
 
+export interface GetProfileResponse extends ApiResponse {
+  user: {
+    id: string;
+    mobile: string;
+    first_name: string;
+    last_name?: string;
+    email?: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+    country?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+}
+
+export interface UpdateProfileRequest {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+}
+
+export interface UpdateProfileResponse extends ApiResponse {
+  user: {
+    id: string;
+    mobile: string;
+    first_name: string;
+    last_name?: string;
+    email?: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+}
+
 export const authApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     sendLoginOTP: builder.mutation<SendOTPResponse, SendOTPRequest>({
@@ -119,6 +160,23 @@ export const authApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['Auth', 'User'],
     }),
+
+    getProfile: builder.query<GetProfileResponse, void>({
+      query: () => ({
+        url: '/auth/profile',
+        method: 'GET',
+      }),
+      providesTags: ['User'],
+    }),
+
+    updateProfile: builder.mutation<UpdateProfileResponse, UpdateProfileRequest>({
+      query: (body) => ({
+        url: '/auth/profile',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -128,5 +186,7 @@ export const {
   useCompleteProfileMutation,
   useRefreshTokenMutation,
   useLogoutMutation,
+  useGetProfileQuery,
+  useUpdateProfileMutation,
 } = authApi;
 
