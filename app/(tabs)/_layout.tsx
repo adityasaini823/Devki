@@ -89,6 +89,14 @@ export default function RootLayout() {
         }}
       />
       <Tabs.Screen
+        name="cart"
+        options={{
+          title: "Cart",
+          tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
+          headerShown: false, // Use custom header in component
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
