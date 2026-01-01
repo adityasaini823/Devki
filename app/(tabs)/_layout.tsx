@@ -18,6 +18,9 @@ export default function RootLayout() {
           borderTopWidth: 0,
           height: 64,
         },
+        tabBarItemStyle: {
+          paddingVertical: 8,
+        },
       }}
     >
       <Tabs.Screen
@@ -89,14 +92,6 @@ export default function RootLayout() {
         }}
       />
       <Tabs.Screen
-        name="cart"
-        options={{
-          title: "Cart",
-          tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
-          headerShown: false, // Use custom header in component
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
@@ -105,6 +100,15 @@ export default function RootLayout() {
             <Ionicons name={focused ? "person-sharp" : "person-outline"} color={color} size={24} />
           ),
           headerShown: true,
+        }}
+      />
+      <Tabs.Screen
+        name="cart"
+        options={{
+          title: "Cart",
+          href: null,
+          // tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
+          headerShown: false, // Use custom header in component
         }}
       />
     </Tabs>

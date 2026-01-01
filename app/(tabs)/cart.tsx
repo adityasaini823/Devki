@@ -197,7 +197,7 @@ export default function Cart() {
       <View style={[styles.customHeader, { backgroundColor: theme.colors.primary, paddingTop: insets.top }]}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => router.push('/(tabs)/store')}
         >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
