@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FlatList,
   Image,
@@ -19,11 +19,13 @@ import { useAddOrUpdateCartItemMutation } from '../../src/redux/api/cartApi';
 export default function Store() {
   const { theme } = useTheme();
   const { data: productsData, isLoading, isError, refetch, isFetching } = useGetProductsQuery();
-  const [addOrUpdateCartItem, { isLoading: isAdding }] = useAddOrUpdateCartItemMutation();
+  const [addOrUpdateCartItem] = useAddOrUpdateCartItemMutation();
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
 
   const products = productsData?.products || [];
 
   const handleAddToCart = async (productId: string, productName: string) => {
+    setAddingProductId(productId);
     try {
       await addOrUpdateCartItem({ product_id: productId, quantity: 1 }).unwrap();
       alert(`Added ${productName} to cart!`);
@@ -31,6 +33,8 @@ export default function Store() {
       const errorMessage =
         error?.data?.message || error?.message || 'Failed to add item to cart. Please try again.';
       alert(errorMessage);
+    } finally {
+      setAddingProductId(null);
     }
   };
 
@@ -77,9 +81,9 @@ export default function Store() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+      {/* <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
         Featured Products {products.length > 0 && `(${products.length})`}
-      </Text>
+      </Text> */}
       {products.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
@@ -138,19 +142,19 @@ export default function Store() {
                     styles.cartButton, 
                     { 
                       backgroundColor: item.product_stock > 0 ? theme.colors.primary : '#D1D5DB',
-                      opacity: item.product_stock > 0 ? (isAdding ? 0.7 : 1) : 0.6,
+                      opacity: item.product_stock > 0 ? (addingProductId === item.id ? 0.7 : 1) : 0.6,
                     }
                   ]} 
                   onPress={() => handleAddToCart(item.id, item.product_name)}
-                  disabled={item.product_stock === 0 || isAdding}
+                  disabled={item.product_stock === 0 || addingProductId === item.id}
                 >
-                  <Text style={styles.cartButtonText}>
-                    {item.product_stock === 0
-                      ? 'Out of Stock'
-                      : isAdding
-                      ? 'Adding...'
-                      : 'Add To Cart'}
-                  </Text>
+                  {addingProductId === item.id ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.cartButtonText}>
+                      {item.product_stock === 0 ? 'Out of Stock' : 'Add To Cart'}
+                    </Text>
+                  )}
                 </Pressable>
               </TouchableOpacity>
             </View>

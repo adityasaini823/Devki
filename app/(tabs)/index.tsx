@@ -23,11 +23,12 @@ export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
 
   // Fetch data
   const { data: productsData, isLoading: isLoadingProducts, refetch: refetchProducts } = useGetProductsQuery();
   const { data: subscriptionData, isLoading: isLoadingSubscription, refetch: refetchSubscription } = useGetSubscriptionQuery();
-  const [addOrUpdateCartItem, { isLoading: isAdding }] = useAddOrUpdateCartItemMutation();
+  const [addOrUpdateCartItem] = useAddOrUpdateCartItemMutation();
 
   const products = productsData?.products || [];
   const featuredProducts = products.slice(0, 4); // Show first 4 products
@@ -48,6 +49,7 @@ export default function HomeScreen() {
   };
 
   const handleAddToCart = async (productId: string, productName: string) => {
+    setAddingProductId(productId);
     try {
       await addOrUpdateCartItem({ product_id: productId, quantity: 1 }).unwrap();
       alert(`Added ${productName} to cart!`);
@@ -55,6 +57,8 @@ export default function HomeScreen() {
       const errorMessage =
         error?.data?.message || error?.message || "Failed to add item to cart. Please try again.";
       alert(errorMessage);
+    } finally {
+      setAddingProductId(null);
     }
   };
 
@@ -226,15 +230,19 @@ export default function HomeScreen() {
                       styles.addToCartButton,
                       {
                         backgroundColor: product.product_stock > 0 ? theme.colors.primary : "#D1D5DB",
-                        opacity: product.product_stock > 0 ? (isAdding ? 0.7 : 1) : 0.6,
+                        opacity: product.product_stock > 0 ? (addingProductId === product.id ? 0.7 : 1) : 0.6,
                       },
                     ]}
                     onPress={() => handleAddToCart(product.id, product.product_name)}
-                    disabled={product.product_stock === 0 || isAdding}
+                    disabled={product.product_stock === 0 || addingProductId === product.id}
                   >
-                    <Text style={styles.addToCartText}>
-                      {product.product_stock === 0 ? "Out of Stock" : "Add to Cart"}
-                    </Text>
+                    {addingProductId === product.id ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.addToCartText}>
+                        {product.product_stock === 0 ? "Out of Stock" : "Add to Cart"}
+                      </Text>
+                    )}
                   </Pressable>
                 </Pressable>
               </View>
