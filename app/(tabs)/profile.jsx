@@ -101,13 +101,16 @@ export default function Profile() {
   };
 
   // Animate drawer close
-  const closeDrawer = () => {
+  const closeDrawer = (callback) => {
     Animated.timing(drawerAnim, {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
       setIsEditModalVisible(false);
+      if (callback && typeof callback === 'function') {
+        callback();
+      }
     });
   };
 
@@ -126,35 +129,38 @@ export default function Profile() {
         await tokenStorage.saveUser(response.user);
       }
       
-      // Close drawer
-      closeDrawer();
-      
-      // Show success animation
-      setShowSuccess(true);
-      scaleAnim.setValue(0);
-      checkmarkAnim.setValue(0);
-      
-      Animated.sequence([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 50,
-          friction: 7,
-        }),
-        Animated.timing(checkmarkAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      
       // Refetch profile data
       refetch();
       
-      // Auto close success modal
-      setTimeout(() => {
-        setShowSuccess(false);
-      }, 2000);
+      // Close drawer and show success modal after it closes
+      closeDrawer(() => {
+        // Wait a tiny bit to ensure drawer modal is fully closed
+        setTimeout(() => {
+          // Show success animation
+          setShowSuccess(true);
+          scaleAnim.setValue(0);
+          checkmarkAnim.setValue(0);
+          
+          Animated.sequence([
+            Animated.spring(scaleAnim, {
+              toValue: 1,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 7,
+            }),
+            Animated.timing(checkmarkAnim, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]).start();
+          
+          // Auto close success modal
+          setTimeout(() => {
+            setShowSuccess(false);
+          }, 2000);
+        }, 100);
+      });
     } catch (error) {
       Alert.alert(
         "Error",
@@ -337,10 +343,10 @@ export default function Profile() {
         visible={isEditModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={closeDrawer}
+        onRequestClose={() => closeDrawer()}
       >
         <View style={styles.drawerOverlay}>
-          <Pressable style={styles.drawerOverlayPressable} onPress={closeDrawer} />
+          <Pressable style={styles.drawerOverlayPressable} onPress={() => closeDrawer()} />
           <Animated.View
             style={[
               styles.drawerContainer,
@@ -359,7 +365,7 @@ export default function Profile() {
                 <Text style={[styles.drawerTitle, { color: theme.colors.textPrimary }]}>
                   Edit Profile
                 </Text>
-                <TouchableOpacity onPress={closeDrawer}>
+                <TouchableOpacity onPress={() => closeDrawer()}>
                   <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -535,7 +541,7 @@ export default function Profile() {
                       backgroundColor: theme.colors.background,
                     },
                   ]}
-                  onPress={closeDrawer}
+                  onPress={() => closeDrawer()}
                 >
                   <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>
                     Cancel
