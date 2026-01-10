@@ -1,0 +1,608 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useTheme } from '../_theme/ThemeProvider';
+import WalletHeader from '../components/headers/WalletHeader';
+import {
+  useGetWalletBalanceQuery,
+  useGetWalletTransactionsQuery,
+  useAddMoneyToWalletMutation,
+  useRequestWithdrawalMutation,
+} from '../../src/redux/api/walletApi';
+
+export default function Wallet() {
+  const { theme } = useTheme();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'overview' | 'add-money' | 'withdraw'>('overview');
+  const [addMoneyAmount, setAddMoneyAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [bankDetails, setBankDetails] = useState({
+    account_number: '',
+    ifsc_code: '',
+    account_holder_name: '',
+  });
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+
+  const { data: balanceData, isLoading: isLoadingBalance, refetch: refetchBalance } = useGetWalletBalanceQuery();
+  const { data: transactionsData, isLoading: isLoadingTransactions } = useGetWalletTransactionsQuery({
+    page: 1,
+    limit: 20,
+  });
+  const [addMoney, { isLoading: isAddingMoney }] = useAddMoneyToWalletMutation();
+  const [requestWithdrawal, { isLoading: isRequestingWithdrawal }] = useRequestWithdrawalMutation();
+
+  const balance = balanceData?.balance || 0;
+  const transactions = transactionsData?.transactions || [];
+
+  const handleAddMoney = async () => {
+    const amount = parseFloat(addMoneyAmount);
+    if (!amount || amount < 10) {
+      Alert.alert('Invalid Amount', 'Minimum deposit amount is ₹10');
+      return;
+    }
+
+    try {
+      await addMoney({ amount, payment_method: 'upi' }).unwrap();
+      Alert.alert('Success', `₹${amount} added to wallet successfully!`);
+      setAddMoneyAmount('');
+      setActiveTab('overview');
+      refetchBalance();
+    } catch (error: any) {
+      Alert.alert('Error', error?.data?.message || 'Failed to add money. Please try again.');
+    }
+  };
+
+  const handleWithdraw = async () => {
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount < 100) {
+      Alert.alert('Invalid Amount', 'Minimum withdrawal amount is ₹100');
+      return;
+    }
+
+    if (!bankDetails.account_number || !bankDetails.ifsc_code || !bankDetails.account_holder_name) {
+      Alert.alert('Missing Details', 'Please fill all bank account details');
+      return;
+    }
+
+    if (amount > balance) {
+      Alert.alert('Insufficient Balance', `Your wallet balance is ₹${balance}`);
+      return;
+    }
+
+    try {
+      await requestWithdrawal({ amount, bank_account: bankDetails }).unwrap();
+      Alert.alert(
+        'Success',
+        'Withdrawal request submitted successfully. It will be processed within 2-3 business days.'
+      );
+      setWithdrawAmount('');
+      setBankDetails({ account_number: '', ifsc_code: '', account_holder_name: '' });
+      setShowWithdrawModal(false);
+      setActiveTab('overview');
+      refetchBalance();
+    } catch (error: any) {
+      Alert.alert('Error', error?.data?.message || 'Failed to request withdrawal. Please try again.');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return '#10B981';
+      case 'pending':
+        return '#F59E0B';
+      case 'rejected':
+      case 'cancelled':
+        return '#EF4444';
+      default:
+        return theme.colors.muted;
+    }
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Custom Header */}
+      <WalletHeader />
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Balance Card */}
+        <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
+          <Text style={styles.balanceLabel}>Wallet Balance</Text>
+          {isLoadingBalance ? (
+            <ActivityIndicator size="small" color="#fff" style={{ marginTop: 8 }} />
+          ) : (
+            <Text style={styles.balanceAmount}>₹{balance.toFixed(2)}</Text>
+          )}
+        </View>
+
+        {/* Tab Buttons */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
+            onPress={() => setActiveTab('overview')}
+          >
+            <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>Overview</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'add-money' && styles.activeTab]}
+            onPress={() => setActiveTab('add-money')}
+          >
+            <Text style={[styles.tabText, activeTab === 'add-money' && styles.activeTabText]}>Add Money</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'withdraw' && styles.activeTab]}
+            onPress={() => setActiveTab('withdraw')}
+          >
+            <Text style={[styles.tabText, activeTab === 'withdraw' && styles.activeTabText]}>Withdraw</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Tab Content */}
+        {activeTab === 'overview' && (
+          <View style={styles.tabContent}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
+            {isLoadingTransactions ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginTop: 20 }} />
+            ) : transactions.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="receipt-outline" size={48} color={theme.colors.muted} />
+                <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No transactions yet</Text>
+              </View>
+            ) : (
+              <View style={styles.transactionsList}>
+                {transactions.map((transaction) => (
+                  <View key={transaction._id} style={[styles.transactionItem, { backgroundColor: theme.colors.card }]}>
+                    <View style={styles.transactionLeft}>
+                      <View
+                        style={[
+                          styles.transactionIcon,
+                          {
+                            backgroundColor:
+                              transaction.transaction_type === 'deposit'
+                                ? 'rgba(16, 185, 129, 0.1)'
+                                : 'rgba(239, 68, 68, 0.1)',
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={transaction.transaction_type === 'deposit' ? 'arrow-down' : 'arrow-up'}
+                          size={20}
+                          color={transaction.transaction_type === 'deposit' ? '#10B981' : '#EF4444'}
+                        />
+                      </View>
+                      <View style={styles.transactionDetails}>
+                        <Text style={[styles.transactionType, { color: theme.colors.text }]}>
+                          {transaction.transaction_type === 'deposit' ? 'Money Added' : 'Withdrawal Request'}
+                        </Text>
+                        <Text style={[styles.transactionDate, { color: theme.colors.muted }]}>
+                          {formatDate(transaction.createdAt)}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.transactionRight}>
+                      <Text
+                        style={[
+                          styles.transactionAmount,
+                          {
+                            color:
+                              transaction.transaction_type === 'deposit' ? '#10B981' : theme.colors.text,
+                          },
+                        ]}
+                      >
+                        {transaction.transaction_type === 'deposit' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
+                      </Text>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: getStatusColor(transaction.status) + '20' },
+                        ]}
+                      >
+                        <Text style={[styles.statusText, { color: getStatusColor(transaction.status) }]}>
+                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {activeTab === 'add-money' && (
+          <View style={styles.tabContent}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Add Money to Wallet</Text>
+            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card }]}>
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount</Text>
+              <View style={styles.amountInputWrapper}>
+                <Text style={[styles.currencySymbol, { color: theme.colors.text }]}>₹</Text>
+                <TextInput
+                  style={[styles.amountInput, { color: theme.colors.text }]}
+                  placeholder="Enter amount (min ₹10)"
+                  placeholderTextColor={theme.colors.muted}
+                  value={addMoneyAmount}
+                  onChangeText={setAddMoneyAmount}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.quickAmounts}>
+                {[100, 500, 1000, 2000].map((amount) => (
+                  <TouchableOpacity
+                    key={amount}
+                    style={[styles.quickAmountButton, { backgroundColor: theme.colors.background }]}
+                    onPress={() => setAddMoneyAmount(amount.toString())}
+                  >
+                    <Text style={[styles.quickAmountText, { color: theme.colors.text }]}>₹{amount}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              onPress={handleAddMoney}
+              disabled={isAddingMoney || !addMoneyAmount}
+            >
+              {isAddingMoney ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Add Money</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {activeTab === 'withdraw' && (
+          <View style={styles.tabContent}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Request Withdrawal</Text>
+            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card }]}>
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount</Text>
+              <View style={styles.amountInputWrapper}>
+                <Text style={[styles.currencySymbol, { color: theme.colors.text }]}>₹</Text>
+                <TextInput
+                  style={[styles.amountInput, { color: theme.colors.text }]}
+                  placeholder="Enter amount (min ₹100)"
+                  placeholderTextColor={theme.colors.muted}
+                  value={withdrawAmount}
+                  onChangeText={setWithdrawAmount}
+                  keyboardType="numeric"
+                />
+              </View>
+              <Text style={[styles.helperText, { color: theme.colors.muted }]}>
+                Available balance: ₹{balance.toFixed(2)}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.secondaryButton, { backgroundColor: theme.colors.card }]}
+              onPress={() => setShowWithdrawModal(true)}
+            >
+              <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
+                {bankDetails.account_number ? 'Update Bank Details' : 'Add Bank Details'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.primaryButton,
+                { backgroundColor: theme.colors.primary },
+                (!withdrawAmount || !bankDetails.account_number) && styles.disabledButton,
+              ]}
+              onPress={handleWithdraw}
+              disabled={isRequestingWithdrawal || !withdrawAmount || !bankDetails.account_number}
+            >
+              {isRequestingWithdrawal ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Request Withdrawal</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Bank Details Modal */}
+      <Modal visible={showWithdrawModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Bank Account Details</Text>
+              <TouchableOpacity onPress={() => setShowWithdrawModal(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Account Holder Name</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: theme.colors.card, color: theme.colors.text }]}
+                  placeholder="Enter account holder name"
+                  placeholderTextColor={theme.colors.muted}
+                  value={bankDetails.account_holder_name}
+                  onChangeText={(text) => setBankDetails({ ...bankDetails, account_holder_name: text })}
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Account Number</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: theme.colors.card, color: theme.colors.text }]}
+                  placeholder="Enter account number"
+                  placeholderTextColor={theme.colors.muted}
+                  value={bankDetails.account_number}
+                  onChangeText={(text) => setBankDetails({ ...bankDetails, account_number: text })}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>IFSC Code</Text>
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: theme.colors.card, color: theme.colors.text }]}
+                  placeholder="Enter IFSC code"
+                  placeholderTextColor={theme.colors.muted}
+                  value={bankDetails.ifsc_code}
+                  onChangeText={(text) => setBankDetails({ ...bankDetails, ifsc_code: text.toUpperCase() })}
+                  autoCapitalize="characters"
+                />
+              </View>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => setShowWithdrawModal(false)}
+              >
+                <Text style={styles.primaryButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  balanceCard: {
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  balanceLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 8,
+  },
+  balanceAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: '#fff',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeTabText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  tabContent: {
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  inputContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  amountInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingBottom: 8,
+    marginBottom: 16,
+  },
+  currencySymbol: {
+    fontSize: 24,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  quickAmounts: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickAmountButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  quickAmountText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  helperText: {
+    fontSize: 12,
+    marginTop: 8,
+  },
+  primaryButton: {
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 14,
+    marginTop: 12,
+  },
+  transactionsList: {
+    gap: 12,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+  },
+  transactionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  transactionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  transactionDetails: {
+    flex: 1,
+  },
+  transactionType: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  transactionDate: {
+    fontSize: 12,
+  },
+  transactionRight: {
+    alignItems: 'flex-end',
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  modalBody: {
+    padding: 16,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  textInput: {
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginTop: 8,
+  },
+  modalFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+});
+
