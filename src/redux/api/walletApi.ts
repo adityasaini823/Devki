@@ -1,4 +1,4 @@
-import { baseApi } from './baseApi';
+import { baseApi, ApiResponse } from './baseApi';
 
 export interface WalletBalance {
   balance: number;
@@ -56,6 +56,9 @@ export const walletApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getWalletBalance: builder.query<WalletBalance, void>({
       query: () => '/wallet/balance',
+      transformResponse: (response: ApiResponse<WalletBalance>) => {
+        return response.data || { balance: 0, user: { name: '' } };
+      },
       providesTags: ['Wallet'],
     }),
     getWalletTransactions: builder.query<
@@ -66,6 +69,9 @@ export const walletApi = baseApi.injectEndpoints({
         url: '/wallet/transactions',
         params: { page, limit, type },
       }),
+      transformResponse: (response: ApiResponse<WalletTransactionsResponse>) => {
+        return response.data || { transactions: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } };
+      },
       providesTags: ['Wallet'],
     }),
     addMoneyToWallet: builder.mutation<

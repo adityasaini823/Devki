@@ -4,6 +4,7 @@ import { TouchableOpacity, View } from "react-native";
 import { useTheme } from "../_theme/ThemeProvider";
 import StoreHeader from "../components/headers/StoreHeader";
 import HomeHeader from "../components/headers/HomeHeader";
+import OrdersHeader from "../components/headers/OrdersHeader";
 
 export default function RootLayout() {
   const { theme } = useTheme();
@@ -73,7 +74,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="orders"
         options={{
-          title: "Orders",
+          header: () => <OrdersHeader />,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "receipt-sharp" : "receipt-outline"}

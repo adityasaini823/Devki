@@ -23,6 +23,8 @@ import {
   useClearCartMutation,
   CartItem,
 } from '../../src/redux/api/cartApi';
+import { useCheckoutMutation } from '../../src/redux/api/orderApi';
+import { useGetWalletBalanceQuery } from '../../src/redux/api/walletApi';
 
 export default function Cart() {
   const { theme } = useTheme();
@@ -32,10 +34,13 @@ export default function Cart() {
   const [updateQuantity, { isLoading: isUpdating }] = useUpdateCartItemQuantityMutation();
   const [removeItem, { isLoading: isRemoving }] = useRemoveCartItemMutation();
   const [clearCart, { isLoading: isClearing }] = useClearCartMutation();
+  const [checkout, { isLoading: isCheckingOut }] = useCheckoutMutation();
+  const { data: walletData, refetch: refetchWallet } = useGetWalletBalanceQuery();
 
   const cartItems = cartData?.items || [];
   const cartTotal = cartData?.cartTotal || 0;
   const itemCount = cartData?.count || 0;
+  const walletBalance = walletData?.balance || 0;
 
   const handleQuantityChange = async (itemId: string, currentQuantity: number, change: number) => {
     const newQuantity = currentQuantity + change;
@@ -103,13 +108,79 @@ export default function Cart() {
     );
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cartItems.length === 0) {
       Alert.alert('Empty Cart', 'Your cart is empty. Add some items to proceed.');
       return;
     }
-    // TODO: Implement checkout flow
-    Alert.alert('Checkout', 'Checkout functionality will be implemented soon!');
+
+    // Check wallet balance
+    if (walletBalance < cartTotal) {
+      const shortfall = cartTotal - walletBalance;
+      Alert.alert(
+        'Insufficient Balance',
+        `Your wallet balance is ₹${walletBalance.toFixed(2)}. You need ₹${shortfall.toFixed(2)} more to complete this purchase.\n\nWould you like to add money to your wallet?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add Money',
+            onPress: () => router.push('/(tabs)/wallet'),
+          },
+        ]
+      );
+      return;
+    }
+
+    // Confirm checkout
+    Alert.alert(
+      'Confirm Checkout',
+      `Total Amount: ₹${cartTotal.toFixed(2)}\nWallet Balance: ₹${walletBalance.toFixed(2)}\n\nProceed with checkout?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            try {
+              const result = await checkout().unwrap();
+              Alert.alert(
+                'Order Placed Successfully!',
+                `Order Number: ${result.data.order.order_number}\nTotal: ₹${result.data.order.total_amount.toFixed(2)}\n\nYour order has been confirmed and will be processed soon.`,
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      refetchWallet();
+                      router.push('/(tabs)/store');
+                    },
+                  },
+                ]
+              );
+            } catch (error: any) {
+              const errorMessage =
+                error?.data?.message ||
+                error?.message ||
+                'Failed to complete checkout. Please try again.';
+              
+              if (error?.data?.shortfall) {
+                Alert.alert(
+                  'Insufficient Balance',
+                  `${errorMessage}\n\nShortfall: ₹${error.data.shortfall.toFixed(2)}\nWould you like to add money to your wallet?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Add Money',
+                      onPress: () => router.push('/(tabs)/wallet'),
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Checkout Failed', errorMessage);
+              }
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderCartItem = ({ item }: { item: CartItem }) => (
@@ -273,12 +344,25 @@ export default function Cart() {
               </Text>
             </View>
             <TouchableOpacity
-              style={[styles.checkoutButton, { backgroundColor: theme.colors.primary }]}
+              style={[
+                styles.checkoutButton,
+                { backgroundColor: theme.colors.primary },
+                (cartItems.length === 0 || isCheckingOut) && styles.disabledButton,
+              ]}
               onPress={handleCheckout}
-              disabled={cartItems.length === 0}
+              disabled={cartItems.length === 0 || isCheckingOut}
             >
-              <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+              {isCheckingOut ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+              )}
             </TouchableOpacity>
+            {walletBalance < cartTotal && cartItems.length > 0 && (
+              <Text style={[styles.walletWarning, { color: theme.colors.error || '#EF4444' }]}>
+                Insufficient wallet balance. Add ₹{(cartTotal - walletBalance).toFixed(2)} more.
+              </Text>
+            )}
           </View>
         </>
       )}
@@ -508,6 +592,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  walletWarning: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
 });
 
