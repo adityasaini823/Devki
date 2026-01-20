@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -27,6 +28,7 @@ export default function Wallet() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'add-money' | 'withdraw'>('overview');
   const [addMoneyAmount, setAddMoneyAmount] = useState('');
+  const [addMoneyRemarks, setAddMoneyRemarks] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [bankDetails, setBankDetails] = useState({
     account_number: '',
@@ -35,13 +37,33 @@ export default function Wallet() {
   });
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
-  const { data: balanceData, isLoading: isLoadingBalance, refetch: refetchBalance } = useGetWalletBalanceQuery();
-  const { data: transactionsData, isLoading: isLoadingTransactions } = useGetWalletTransactionsQuery({
-    page: 1,
-    limit: 20,
-  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const { data: balanceData, isLoading: isLoadingBalance, refetch: refetchBalance } = useGetWalletBalanceQuery(
+    undefined,
+    { pollingInterval: 30000 } // Poll every 30 seconds for balance updates
+  );
+  const { 
+    data: transactionsData, 
+    isLoading: isLoadingTransactions,
+    refetch: refetchTransactions,
+    isFetching: isFetchingTransactions,
+  } = useGetWalletTransactionsQuery(
+    { page: 1, limit: 20 },
+    { pollingInterval: 30000 } // Poll every 30 seconds for transaction updates
+  );
   const [addMoney, { isLoading: isAddingMoney }] = useAddMoneyToWalletMutation();
   const [requestWithdrawal, { isLoading: isRequestingWithdrawal }] = useRequestWithdrawalMutation();
+
+  // Pull to refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchBalance(), refetchTransactions()]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchBalance, refetchTransactions]);
 
   const balance = balanceData?.balance || 0;
   const transactions = transactionsData?.transactions || [];
@@ -54,13 +76,19 @@ export default function Wallet() {
     }
 
     try {
-      await addMoney({ amount, payment_method: 'upi' }).unwrap();
-      Alert.alert('Success', `₹${amount} added to wallet successfully!`);
+      await addMoney({ amount, payment_method: 'upi', remarks: addMoneyRemarks || undefined }).unwrap();
+      Alert.alert(
+        'Request Submitted', 
+        `Your request to add ₹${amount} has been submitted successfully. The amount will be credited to your wallet once approved by admin.`
+      );
       setAddMoneyAmount('');
+      setAddMoneyRemarks('');
       setActiveTab('overview');
+      // Refetch both balance and transactions
       refetchBalance();
+      refetchTransactions();
     } catch (error: any) {
-      Alert.alert('Error', error?.data?.message || 'Failed to add money. Please try again.');
+      Alert.alert('Error', error?.data?.message || 'Failed to submit request. Please try again.');
     }
   };
 
@@ -91,7 +119,9 @@ export default function Wallet() {
       setBankDetails({ account_number: '', ifsc_code: '', account_holder_name: '' });
       setShowWithdrawModal(false);
       setActiveTab('overview');
+      // Refetch both balance and transactions
       refetchBalance();
+      refetchTransactions();
     } catch (error: any) {
       Alert.alert('Error', error?.data?.message || 'Failed to request withdrawal. Please try again.');
     }
@@ -121,7 +151,18 @@ export default function Wallet() {
       {/* Custom Header */}
       <WalletHeader />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
         {/* Balance Card */}
         <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
           <Text style={styles.balanceLabel}>Wallet Balance</Text>
@@ -157,7 +198,12 @@ export default function Wallet() {
         {/* Tab Content */}
         {activeTab === 'overview' && (
           <View style={styles.tabContent}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
+              {isFetchingTransactions && !isLoadingTransactions && (
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              )}
+            </View>
             {isLoadingTransactions ? (
               <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginTop: 20 }} />
             ) : transactions.length === 0 ? (
@@ -189,7 +235,9 @@ export default function Wallet() {
                       </View>
                       <View style={styles.transactionDetails}>
                         <Text style={[styles.transactionType, { color: theme.colors.text }]}>
-                          {transaction.transaction_type === 'deposit' ? 'Money Added' : 'Withdrawal Request'}
+                          {transaction.transaction_type === 'deposit' 
+                            ? (transaction.status === 'completed' ? 'Money Added' : 'Deposit Request')
+                            : 'Withdrawal Request'}
                         </Text>
                         <Text style={[styles.transactionDate, { color: theme.colors.muted }]}>
                           {formatDate(transaction.createdAt)}
@@ -254,6 +302,21 @@ export default function Wallet() {
                 ))}
               </View>
             </View>
+            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card }]}>
+              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Remarks (Optional)</Text>
+              <TextInput
+                style={[styles.remarksInput, { color: theme.colors.text, backgroundColor: theme.colors.background }]}
+                placeholder="e.g., Payment reference, UPI ID used, etc."
+                placeholderTextColor={theme.colors.muted}
+                value={addMoneyRemarks}
+                onChangeText={setAddMoneyRemarks}
+                multiline
+                numberOfLines={2}
+              />
+              <Text style={[styles.helperText, { color: theme.colors.muted }]}>
+                Add any reference details to help admin verify your payment
+              </Text>
+            </View>
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
               onPress={handleAddMoney}
@@ -262,9 +325,12 @@ export default function Wallet() {
               {isAddingMoney ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.primaryButtonText}>Add Money</Text>
+                <Text style={styles.primaryButtonText}>Submit Request</Text>
               )}
             </TouchableOpacity>
+            <Text style={[styles.noteText, { color: theme.colors.muted }]}>
+              Note: Your wallet will be credited once the admin approves your request.
+            </Text>
           </View>
         )}
 
@@ -429,10 +495,15 @@ const styles = StyleSheet.create({
   tabContent: {
     marginTop: 8,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
   },
   inputContainer: {
     borderRadius: 12,
@@ -479,6 +550,20 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 12,
     marginTop: 8,
+  },
+  remarksInput: {
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    marginTop: 8,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  noteText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 12,
+    paddingHorizontal: 16,
   },
   primaryButton: {
     paddingVertical: 16,

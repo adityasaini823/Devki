@@ -41,6 +41,7 @@ export interface AddMoneyRequest {
   amount: number;
   payment_method?: string;
   payment_id?: string;
+  remarks?: string;
 }
 
 export interface WithdrawalRequest {
