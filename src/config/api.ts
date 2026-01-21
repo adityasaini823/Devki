@@ -11,7 +11,7 @@ const getBaseURL = (): string => {
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     url = `http://${url}`;
   }
-  
+
   if (__DEV__) {
     console.log('Final API Base URL:', url);
   }
