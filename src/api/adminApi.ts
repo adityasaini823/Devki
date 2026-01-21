@@ -1,24 +1,22 @@
 import API_CONFIG from '../config/api';
+import { tokenStorage } from '../utils/tokenStorage';
 
-export const uploadImage = async (formData: FormData) => {
+export const uploadImage = async (formData: FormData, folder: string = 'devki_uploads') => {
     try {
-        const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/upload`, {
+        const token = await tokenStorage.getToken();
+
+        // Remove trailing slash if present to avoid double slash
+        const baseUrl = API_CONFIG.BASE_URL.endsWith('/')
+            ? API_CONFIG.BASE_URL.slice(0, -1)
+            : API_CONFIG.BASE_URL;
+
+        const response = await fetch(`${baseUrl}/upload?folder=${folder}`, {
             method: 'POST',
             body: formData,
-            // Do NOT set Content-Type header when sending FormData, 
-            // the browser/client sets it with the boundary automatically.
             headers: {
-                // You might need auth headers here if the endpoint is protected
-                // 'Authorization': `Bearer ${token}` 
-                // But for now we'll assume the cookie (credentials: include) handles it 
-                // or we need to pass a token.
-                // The backend uses 'authenticateAdmin' middleware which checks for:
-                // 1. Authorization header
-                // 2. Cookie 'adminRefreshToken' ? No, that's for refresh.
-                // Let's check adminAuth.js middleware later if needed.
-                // For now, let's assume standard fetch setup + credentials.
+                'Authorization': `Bearer ${token}`,
             },
-            credentials: 'include', // Important for cookies
+            credentials: 'include',
         });
 
         const data = await response.json();

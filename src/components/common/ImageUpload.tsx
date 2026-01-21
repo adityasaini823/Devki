@@ -5,18 +5,19 @@ import { uploadImage } from '../../api/adminApi';
 
 interface ImageUploadProps {
     onUploadComplete?: (url: string) => void;
-    existingImage?: string;
+    initialImage?: string;
+    folder?: string;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ onUploadComplete, existingImage }) => {
-    const [image, setImage] = useState<string | null>(existingImage || null);
+const ImageUpload: React.FC<ImageUploadProps> = ({ onUploadComplete, initialImage, folder = 'devki_uploads' }) => {
+    const [image, setImage] = useState<string | null>(initialImage || null);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const pickImage = async () => {
         // No permissions request is necessary for launching the image library
         let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [4, 3],
             quality: 1,
@@ -50,7 +51,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onUploadComplete, existingIma
                 formData.append('image', { uri: localUri, name: filename, type });
             }
 
-            const response = await uploadImage(formData);
+            const response = await uploadImage(formData, folder);
 
             if (response && response.success) {
                 const uploadedUrl = response.data.url;

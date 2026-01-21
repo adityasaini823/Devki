@@ -22,6 +22,8 @@ import {
   useAddMoneyToWalletMutation,
   useRequestWithdrawalMutation,
 } from '../../src/redux/api/walletApi';
+import { useGetProfileQuery } from '../../src/redux/api/authApi';
+import ImageUpload from '../../src/components/common/ImageUpload';
 
 export default function Wallet() {
   const { theme } = useTheme();
@@ -29,6 +31,8 @@ export default function Wallet() {
   const [activeTab, setActiveTab] = useState<'overview' | 'add-money' | 'withdraw'>('overview');
   const [addMoneyAmount, setAddMoneyAmount] = useState('');
   const [addMoneyRemarks, setAddMoneyRemarks] = useState('');
+  const [paymentProofUrl, setPaymentProofUrl] = useState('');
+  const [transactionId, setTransactionId] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [bankDetails, setBankDetails] = useState({
     account_number: '',
@@ -43,8 +47,8 @@ export default function Wallet() {
     undefined,
     { pollingInterval: 30000 } // Poll every 30 seconds for balance updates
   );
-  const { 
-    data: transactionsData, 
+  const {
+    data: transactionsData,
     isLoading: isLoadingTransactions,
     refetch: refetchTransactions,
     isFetching: isFetchingTransactions,
@@ -52,6 +56,11 @@ export default function Wallet() {
     { page: 1, limit: 20 },
     { pollingInterval: 30000 } // Poll every 30 seconds for transaction updates
   );
+
+  const { data: profileData } = useGetProfileQuery();
+  const userId = profileData?.user?.id || 'unknown';
+  const paymentFolder = `devki/payments/user_${userId}`;
+
   const [addMoney, { isLoading: isAddingMoney }] = useAddMoneyToWalletMutation();
   const [requestWithdrawal, { isLoading: isRequestingWithdrawal }] = useRequestWithdrawalMutation();
 
@@ -75,14 +84,32 @@ export default function Wallet() {
       return;
     }
 
+    if (!paymentProofUrl) {
+      Alert.alert('Payment Proof Required', 'Please upload a screenshot of your payment');
+      return;
+    }
+
+    if (!transactionId) {
+      Alert.alert('Transaction ID Required', 'Please enter the UPI Transaction ID');
+      return;
+    }
+
     try {
-      await addMoney({ amount, payment_method: 'upi', remarks: addMoneyRemarks || undefined }).unwrap();
+      await addMoney({
+        amount,
+        payment_method: 'upi',
+        payment_id: transactionId,
+        payment_proof: paymentProofUrl,
+        remarks: addMoneyRemarks || undefined
+      }).unwrap();
       Alert.alert(
-        'Request Submitted', 
-        `Your request to add ₹${amount} has been submitted successfully. The amount will be credited to your wallet once approved by admin.`
+        'Request Submitted',
+        `Your request to add ₹${amount} has been submitted successfully with proof. The amount will be credited once verified by admin.`
       );
       setAddMoneyAmount('');
       setAddMoneyRemarks('');
+      setPaymentProofUrl('');
+      setTransactionId('');
       setActiveTab('overview');
       // Refetch both balance and transactions
       refetchBalance();
@@ -151,8 +178,8 @@ export default function Wallet() {
       {/* Custom Header */}
       <WalletHeader />
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -235,7 +262,7 @@ export default function Wallet() {
                       </View>
                       <View style={styles.transactionDetails}>
                         <Text style={[styles.transactionType, { color: theme.colors.text }]}>
-                          {transaction.transaction_type === 'deposit' 
+                          {transaction.transaction_type === 'deposit'
                             ? (transaction.status === 'completed' ? 'Money Added' : 'Deposit Request')
                             : 'Withdrawal Request'}
                         </Text>
@@ -317,10 +344,60 @@ export default function Wallet() {
                 Add any reference details to help admin verify your payment
               </Text>
             </View>
+
+            {/* UPI Payment Details Section */}
+            <View style={[styles.paymentInstructionContainer, { backgroundColor: 'rgba(59, 130, 246, 0.05)', borderColor: theme.colors.primary }]}>
+              <Text style={[styles.instructionTitle, { color: theme.colors.primary }]}>Payment Instructions</Text>
+              <Text style={[styles.instructionText, { color: theme.colors.text }]}>
+                1. Open your preferred UPI app (Google Pay, PhonePe, etc.)
+              </Text>
+              <Text style={[styles.instructionText, { color: theme.colors.text }]}>
+                2. Pay ₹{addMoneyAmount || '0'} to the UPI ID below:
+              </Text>
+
+              <View style={[styles.upiIdContainer, { backgroundColor: theme.colors.card }]}>
+                <Text style={[styles.upiIdText, { color: theme.colors.text }]}>adityasaini2468@okicici</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    // In a real app, you'd copy to clipboard here
+                    Alert.alert('Copied', 'UPI ID copied to clipboard');
+                  }}
+                >
+                  <Ionicons name="copy-outline" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.instructionText, { color: theme.colors.text, marginTop: 8 }]}>
+                3. Enter the UPI Transaction ID / Ref No. below:
+              </Text>
+              <TextInput
+                style={[styles.transactionIdInput, { color: theme.colors.text, backgroundColor: theme.colors.card, borderColor: theme.colors.muted + '40' }]}
+                placeholder="UPI Transaction ID (12 digits)"
+                placeholderTextColor={theme.colors.muted}
+                value={transactionId}
+                onChangeText={setTransactionId}
+              />
+
+              <Text style={[styles.instructionText, { color: theme.colors.text, marginTop: 8 }]}>
+                4. Upload the screenshot of the successful payment:
+              </Text>
+              <View style={styles.uploadWrapper}>
+                <ImageUpload
+                  onUploadComplete={(url) => setPaymentProofUrl(url)}
+                  initialImage={paymentProofUrl || undefined}
+                  folder={paymentFolder}
+                />
+              </View>
+            </View>
+
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: theme.colors.primary },
+                (!addMoneyAmount || !transactionId || !paymentProofUrl) && styles.disabledButton
+              ]}
               onPress={handleAddMoney}
-              disabled={isAddingMoney || !addMoneyAmount}
+              disabled={isAddingMoney || !addMoneyAmount || !transactionId || !paymentProofUrl}
             >
               {isAddingMoney ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -688,6 +765,46 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+  },
+  paymentInstructionContainer: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  instructionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  instructionText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  upiIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  upiIdText: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+  },
+  transactionIdInput: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+    fontSize: 14,
+  },
+  uploadWrapper: {
+    marginTop: 12,
+    alignItems: 'center',
   },
 });
 
