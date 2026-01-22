@@ -50,6 +50,12 @@ export default function Cart() {
   const itemCount = cartData?.count || 0;
   const walletBalance = walletData?.balance || 0;
 
+  // Refetch function for pull-to-refresh
+  const handleRefresh = () => {
+    refetch();
+    refetchWallet();
+  };
+
   const handleQuantityChange = async (itemId: string, currentQuantity: number, change: number) => {
     const newQuantity = currentQuantity + change;
     if (newQuantity < 1) {
@@ -326,7 +332,7 @@ export default function Cart() {
             refreshControl={
               <RefreshControl
                 refreshing={isFetching}
-                onRefresh={refetch}
+                onRefresh={handleRefresh}
                 tintColor={theme.colors.primary}
               />
             }

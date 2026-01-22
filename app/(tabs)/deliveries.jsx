@@ -78,6 +78,12 @@ export default function Deliveries() {
     const subscription = subscriptionData?.subscription;
     const deliveries = deliveriesData?.deliveries || [];
 
+    // Refetch function for pull-to-refresh
+    const handleRefresh = () => {
+        refetchSubscription();
+        refetchDeliveries();
+    };
+
     // Separate upcoming and past deliveries
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -213,7 +219,7 @@ export default function Deliveries() {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
-                        <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={theme.colors.primary} />
+                        <RefreshControl refreshing={isFetching} onRefresh={handleRefresh} tintColor={theme.colors.primary} />
                     }
                 >
                     {/* Subscription Summary */}
