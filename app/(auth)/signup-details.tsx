@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import Toast from 'react-native-toast-message';
 import {
     View,
     Text,
@@ -54,6 +55,7 @@ const ModernInput: React.FC<InputFieldProps> = ({
     secureTextEntry = false,
     inputRef,
 }) => {
+    const { theme } = useTheme();
     const [isFocused, setIsFocused] = useState(false);
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -183,10 +185,11 @@ export default function SignupDetails() {
     
     const handleSubmit = async () => {
         if (!isFormValid()) {
-            Alert.alert(
-                'Almost There!',
-                'Please complete all required fields to continue.'
-            );
+            Toast.show({
+                type: 'error',
+                text1: 'Almost There!',
+                text2: 'Please complete all required fields to continue.',
+            });
             return;
         }
         
@@ -238,10 +241,11 @@ export default function SignupDetails() {
                 router.replace('/(tabs)');
             }, 2000);
         } catch (error: any) {
-            Alert.alert(
-                'Error',
-                error?.data?.message || error?.message || 'Failed to complete profile. Please check your connection and try again.'
-            );
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error?.data?.message || error?.message || 'Failed to complete profile. Please check your connection and try again.',
+            });
         }
     };
     

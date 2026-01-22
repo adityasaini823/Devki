@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import Toast from 'react-native-toast-message';
 import {
   View,
   Text,
@@ -9,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Pressable,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ import {
   useRequestWithdrawalMutation,
 } from '../../src/redux/api/walletApi';
 import { useGetProfileQuery } from '../../src/redux/api/authApi';
+import { useGetSettingsQuery } from '../../src/redux/api/settingsApi';
 import ImageUpload from '../../src/components/common/ImageUpload';
 
 export default function Wallet() {
@@ -57,6 +58,9 @@ export default function Wallet() {
     { pollingInterval: 30000 } // Poll every 30 seconds for transaction updates
   );
 
+  const { data: settingsData, isLoading: isLoadingSettings } = useGetSettingsQuery();
+  const upiId = settingsData?.settings?.payment?.upi_id || 'adityasaini2468@okicici'; // Fallback
+
   const { data: profileData } = useGetProfileQuery();
   const userId = profileData?.user?.id || 'unknown';
   const paymentFolder = `devki/payments/user_${userId}`;
@@ -77,20 +81,45 @@ export default function Wallet() {
   const balance = balanceData?.balance || 0;
   const transactions = transactionsData?.transactions || [];
 
+  const handleAmountChange = (text: string, setter: (value: string) => void) => {
+    // allow only numbers and one decimal point
+    let cleaned = text.replace(/[^0-9.]/g, '');
+    
+    // prevent multiple decimal points
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    setter(cleaned);
+  };
+
   const handleAddMoney = async () => {
     const amount = parseFloat(addMoneyAmount);
     if (!amount || amount < 10) {
-      Alert.alert('Invalid Amount', 'Minimum deposit amount is ₹10');
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Amount',
+        text2: 'Minimum deposit amount is ₹10',
+      });
       return;
     }
 
     if (!paymentProofUrl) {
-      Alert.alert('Payment Proof Required', 'Please upload a screenshot of your payment');
+      Toast.show({
+        type: 'error',
+        text1: 'Payment Proof Required',
+        text2: 'Please upload a screenshot of your payment',
+      });
       return;
     }
 
     if (!transactionId) {
-      Alert.alert('Transaction ID Required', 'Please enter the UPI Transaction ID');
+      Toast.show({
+        type: 'error',
+        text1: 'Transaction ID Required',
+        text2: 'Please enter the UPI Transaction ID',
+      });
       return;
     }
 
@@ -102,10 +131,11 @@ export default function Wallet() {
         payment_proof: paymentProofUrl,
         remarks: addMoneyRemarks || undefined
       }).unwrap();
-      Alert.alert(
-        'Request Submitted',
-        `Your request to add ₹${amount} has been submitted successfully with proof. The amount will be credited once verified by admin.`
-      );
+      Toast.show({
+        type: 'success',
+        text1: 'Request Submitted',
+        text2: `Request to add ₹${amount} submitted successfully!`,
+      });
       setAddMoneyAmount('');
       setAddMoneyRemarks('');
       setPaymentProofUrl('');
@@ -115,7 +145,11 @@ export default function Wallet() {
       refetchBalance();
       refetchTransactions();
     } catch (error: any) {
-      Alert.alert('Error', error?.data?.message || 'Failed to submit request. Please try again.');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error?.data?.message || 'Failed to submit request. Please try again.',
+      });
     }
   };
 
@@ -313,7 +347,7 @@ export default function Wallet() {
                   placeholder="Enter amount (min ₹10)"
                   placeholderTextColor={theme.colors.muted}
                   value={addMoneyAmount}
-                  onChangeText={setAddMoneyAmount}
+                  onChangeText={(text) => handleAmountChange(text, setAddMoneyAmount)}
                   keyboardType="numeric"
                 />
               </View>
@@ -356,11 +390,20 @@ export default function Wallet() {
               </Text>
 
               <View style={[styles.upiIdContainer, { backgroundColor: theme.colors.card }]}>
-                <Text style={[styles.upiIdText, { color: theme.colors.text }]}>adityasaini2468@okicici</Text>
+                {isLoadingSettings ? (
+                   <ActivityIndicator size="small" color={theme.colors.primary} />
+                ) : (
+                   <Text style={[styles.upiIdText, { color: theme.colors.text }]}>{upiId}</Text>
+                )}
                 <TouchableOpacity
                   onPress={() => {
                     // In a real app, you'd copy to clipboard here
-                    Alert.alert('Copied', 'UPI ID copied to clipboard');
+                    // TODO: Implement actual clipboard copy using expo-clipboard
+                    Toast.show({
+                      type: 'success',
+                      text1: 'Copied',
+                      text2: 'UPI ID copied to clipboard',
+                    });
                   }}
                 >
                   <Ionicons name="copy-outline" size={20} color={theme.colors.primary} />
@@ -423,7 +466,7 @@ export default function Wallet() {
                   placeholder="Enter amount (min ₹100)"
                   placeholderTextColor={theme.colors.muted}
                   value={withdrawAmount}
-                  onChangeText={setWithdrawAmount}
+                  onChangeText={(text) => handleAmountChange(text, setWithdrawAmount)}
                   keyboardType="numeric"
                 />
               </View>

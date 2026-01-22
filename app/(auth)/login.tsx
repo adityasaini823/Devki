@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Toast from 'react-native-toast-message';
 import { 
     View, 
     Text, 
@@ -55,7 +56,11 @@ export default function Login() {
     const handleLogin = async () => {
         const cleanedNumber = mobileNumber.replace(/\D/g, '');
         if (cleanedNumber.length !== 10) {
-            Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number');
+            Toast.show({
+                type: 'error',
+                text1: 'Invalid Number',
+                text2: 'Please enter a valid 10-digit mobile number',
+            });
             return;
         }
 
@@ -73,16 +78,11 @@ export default function Login() {
         } catch (error: any) {
             const errorMessage = error?.data?.message || error?.message || 'Failed to send OTP. Please check your connection and try again.';
             
-            Alert.alert(
-                'Connection Error', 
-                errorMessage,
-                [
-                    {
-                        text: 'OK',
-                        style: 'default'
-                    }
-                ]
-            );
+            Toast.show({
+                type: 'error',
+                text1: 'Connection Error',
+                text2: errorMessage,
+            });
         }
     };
     
@@ -92,8 +92,8 @@ export default function Login() {
     return (
         <KeyboardAvoidingView
             style={styles.keyboardView}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <ScrollView

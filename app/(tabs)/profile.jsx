@@ -14,6 +14,7 @@ import {
   Alert,
   Pressable,
 } from "react-native";
+import Toast from 'react-native-toast-message';
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../_theme/ThemeProvider";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,12 +27,12 @@ export default function Profile() {
   const router = useRouter();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  
+
   // Animation refs
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const checkmarkAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Form state
   const [formData, setFormData] = useState({
     first_name: "",
@@ -123,15 +124,15 @@ export default function Profile() {
   const handleSave = async () => {
     try {
       const response = await updateProfile(formData).unwrap();
-      
+
       // Update local storage
       if (response.user) {
         await tokenStorage.saveUser(response.user);
       }
-      
+
       // Refetch profile data
       refetch();
-      
+
       // Close drawer and show success modal after it closes
       closeDrawer(() => {
         // Wait a tiny bit to ensure drawer modal is fully closed
@@ -140,7 +141,7 @@ export default function Profile() {
           setShowSuccess(true);
           scaleAnim.setValue(0);
           checkmarkAnim.setValue(0);
-          
+
           Animated.sequence([
             Animated.spring(scaleAnim, {
               toValue: 1,
@@ -154,18 +155,19 @@ export default function Profile() {
               useNativeDriver: true,
             }),
           ]).start();
-          
+
           // Auto close success modal
           setTimeout(() => {
             setShowSuccess(false);
           }, 2000);
-        }, 100);
+        });
       });
     } catch (error) {
-      Alert.alert(
-        "Error",
-        error?.data?.message || error?.message || "Failed to update profile. Please try again."
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error?.data?.message || error?.message || "Failed to update profile. Please try again.",
+      });
     }
   };
 
@@ -314,7 +316,11 @@ export default function Profile() {
         <View style={styles.buttonGroup}>
           <TouchableOpacity
             style={[styles.dangerButton, { borderColor: theme.colors.error }]}
-            onPress={() => Alert.alert("Help & Support", "Contact us at support@devki.com")}
+            onPress={() => Toast.show({
+              type: 'info',
+              text1: 'Help & Support',
+              text2: 'Contact us at support@devki.com'
+            })}
           >
             <Ionicons name="help-circle-outline" size={18} color={theme.colors.error} />
             <Text style={[styles.dangerButtonText, { color: theme.colors.error }]}>
@@ -356,225 +362,225 @@ export default function Profile() {
               },
             ]}
           >
-              {/* Drag Handle */}
-              <View style={styles.dragHandleContainer}>
-                <View style={[styles.dragHandle, { backgroundColor: theme.colors.border }]} />
-              </View>
+            {/* Drag Handle */}
+            <View style={styles.dragHandleContainer}>
+              <View style={[styles.dragHandle, { backgroundColor: theme.colors.border }]} />
+            </View>
 
-              <View style={styles.drawerHeader}>
-                <Text style={[styles.drawerTitle, { color: theme.colors.textPrimary }]}>
-                  Edit Profile
-                </Text>
-                <TouchableOpacity onPress={() => closeDrawer()}>
-                  <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
+            <View style={styles.drawerHeader}>
+              <Text style={[styles.drawerTitle, { color: theme.colors.textPrimary }]}>
+                Edit Profile
+              </Text>
+              <TouchableOpacity onPress={() => closeDrawer()}>
+                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.drawerContentWrapper}>
-                <ScrollView 
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.drawerContentContainer}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-                      First Name *
-                    </Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          backgroundColor: theme.colors.background,
-                          borderColor: theme.colors.border,
-                          color: theme.colors.textPrimary,
-                        },
-                      ]}
-                      value={formData.first_name}
-                      onChangeText={(text) => setFormData({ ...formData, first_name: text })}
-                      placeholder="Enter first name"
-                      placeholderTextColor={theme.colors.muted}
-                    />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-                      Last Name
-                    </Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          backgroundColor: theme.colors.background,
-                          borderColor: theme.colors.border,
-                          color: theme.colors.textPrimary,
-                        },
-                      ]}
-                      value={formData.last_name}
-                      onChangeText={(text) => setFormData({ ...formData, last_name: text })}
-                      placeholder="Enter last name"
-                      placeholderTextColor={theme.colors.muted}
-                    />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-                      Email
-                    </Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          backgroundColor: theme.colors.background,
-                          borderColor: theme.colors.border,
-                          color: theme.colors.textPrimary,
-                        },
-                      ]}
-                      value={formData.email}
-                      onChangeText={(text) => setFormData({ ...formData, email: text })}
-                      placeholder="Enter email"
-                      placeholderTextColor={theme.colors.muted}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-                      Address *
-                    </Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          backgroundColor: theme.colors.background,
-                          borderColor: theme.colors.border,
-                          color: theme.colors.textPrimary,
-                        },
-                      ]}
-                      value={formData.address}
-                      onChangeText={(text) => setFormData({ ...formData, address: text })}
-                      placeholder="Enter address"
-                      placeholderTextColor={theme.colors.muted}
-                      multiline
-                      numberOfLines={3}
-                    />
-                  </View>
-
-                  <View style={styles.inputRow}>
-                    <View style={[styles.inputGroup, styles.halfWidth]}>
-                      <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-                        City *
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            backgroundColor: theme.colors.background,
-                            borderColor: theme.colors.border,
-                            color: theme.colors.textPrimary,
-                          },
-                        ]}
-                        value={formData.city}
-                        onChangeText={(text) => setFormData({ ...formData, city: text })}
-                        placeholder="City"
-                        placeholderTextColor={theme.colors.muted}
-                      />
-                    </View>
-
-                    <View style={[styles.inputGroup, styles.halfWidth]}>
-                      <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-                        State *
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            backgroundColor: theme.colors.background,
-                            borderColor: theme.colors.border,
-                            color: theme.colors.textPrimary,
-                          },
-                        ]}
-                        value={formData.state}
-                        onChangeText={(text) => setFormData({ ...formData, state: text })}
-                        placeholder="State"
-                        placeholderTextColor={theme.colors.muted}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-                      Pincode *
-                    </Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          backgroundColor: theme.colors.background,
-                          borderColor: theme.colors.border,
-                          color: theme.colors.textPrimary,
-                        },
-                      ]}
-                      value={formData.pincode}
-                      onChangeText={(text) => {
-                        const cleaned = text.replace(/\D/g, "").slice(0, 6);
-                        setFormData({ ...formData, pincode: cleaned });
-                      }}
-                      placeholder="Enter 6-digit pincode"
-                      placeholderTextColor={theme.colors.muted}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                    />
-                  </View>
-                </ScrollView>
-              </View>
-
-              <View style={[
-                styles.drawerFooter,
-                { backgroundColor: theme.colors.card }
-              ]}>
-                <TouchableOpacity
-                  style={[
-                    styles.cancelButton,
-                    {
-                      borderColor: theme.colors.border,
-                      backgroundColor: theme.colors.background,
-                    },
-                  ]}
-                  onPress={() => closeDrawer()}
-                >
-                  <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>
-                    Cancel
+            <View style={styles.drawerContentWrapper}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.drawerContentContainer}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                    First Name *
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.saveButton,
-                    {
-                      backgroundColor:
-                        formData.first_name && formData.address && formData.city && formData.state && formData.pincode
-                          ? theme.colors.primary
-                          : "#D1D5DB",
-                    },
-                  ]}
-                  onPress={handleSave}
-                  disabled={
-                    isUpdating ||
-                    !formData.first_name ||
-                    !formData.address ||
-                    !formData.city ||
-                    !formData.state ||
-                    !formData.pincode
-                  }
-                >
-                  {isUpdating ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.saveButtonText}>Save Changes</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.background,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.textPrimary,
+                      },
+                    ]}
+                    value={formData.first_name}
+                    onChangeText={(text) => setFormData({ ...formData, first_name: text })}
+                    placeholder="Enter first name"
+                    placeholderTextColor={theme.colors.muted}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                    Last Name
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.background,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.textPrimary,
+                      },
+                    ]}
+                    value={formData.last_name}
+                    onChangeText={(text) => setFormData({ ...formData, last_name: text })}
+                    placeholder="Enter last name"
+                    placeholderTextColor={theme.colors.muted}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                    Email
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.background,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.textPrimary,
+                      },
+                    ]}
+                    value={formData.email}
+                    onChangeText={(text) => setFormData({ ...formData, email: text })}
+                    placeholder="Enter email"
+                    placeholderTextColor={theme.colors.muted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                    Address *
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.background,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.textPrimary,
+                      },
+                    ]}
+                    value={formData.address}
+                    onChangeText={(text) => setFormData({ ...formData, address: text })}
+                    placeholder="Enter address"
+                    placeholderTextColor={theme.colors.muted}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <View style={styles.inputRow}>
+                  <View style={[styles.inputGroup, styles.halfWidth]}>
+                    <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                      City *
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.colors.background,
+                          borderColor: theme.colors.border,
+                          color: theme.colors.textPrimary,
+                        },
+                      ]}
+                      value={formData.city}
+                      onChangeText={(text) => setFormData({ ...formData, city: text })}
+                      placeholder="City"
+                      placeholderTextColor={theme.colors.muted}
+                    />
+                  </View>
+
+                  <View style={[styles.inputGroup, styles.halfWidth]}>
+                    <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                      State *
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.colors.background,
+                          borderColor: theme.colors.border,
+                          color: theme.colors.textPrimary,
+                        },
+                      ]}
+                      value={formData.state}
+                      onChangeText={(text) => setFormData({ ...formData, state: text })}
+                      placeholder="State"
+                      placeholderTextColor={theme.colors.muted}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                    Pincode *
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.background,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.textPrimary,
+                      },
+                    ]}
+                    value={formData.pincode}
+                    onChangeText={(text) => {
+                      const cleaned = text.replace(/\D/g, "").slice(0, 6);
+                      setFormData({ ...formData, pincode: cleaned });
+                    }}
+                    placeholder="Enter 6-digit pincode"
+                    placeholderTextColor={theme.colors.muted}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+                </View>
+              </ScrollView>
+            </View>
+
+            <View style={[
+              styles.drawerFooter,
+              { backgroundColor: theme.colors.card }
+            ]}>
+              <TouchableOpacity
+                style={[
+                  styles.cancelButton,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.background,
+                  },
+                ]}
+                onPress={() => closeDrawer()}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  {
+                    backgroundColor:
+                      formData.first_name && formData.address && formData.city && formData.state && formData.pincode
+                        ? theme.colors.primary
+                        : "#D1D5DB",
+                  },
+                ]}
+                onPress={handleSave}
+                disabled={
+                  isUpdating ||
+                  !formData.first_name ||
+                  !formData.address ||
+                  !formData.city ||
+                  !formData.state ||
+                  !formData.pincode
+                }
+              >
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </View>
       </Modal>
 

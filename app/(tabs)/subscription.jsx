@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import Toast from 'react-native-toast-message';
 import {
   View,
   Text,
@@ -60,7 +61,7 @@ const darkenColor = (color) => {
 export default function Subscription() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   // Fetch subscription products from API
   const { data: productsData, isLoading: isLoadingProducts } = useGetSubscriptionProductsQuery();
   // Fetch existing subscription
@@ -101,7 +102,11 @@ export default function Subscription() {
   // Handle checkout/save subscription
   const handleCheckout = async () => {
     if (!selectedProductId) {
-      Alert.alert('Error', 'Please select a milk quantity');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a milk quantity',
+      });
       return;
     }
 
@@ -113,17 +118,17 @@ export default function Subscription() {
       }).unwrap();
 
       if (result.success) {
-        Alert.alert(
-          'Success',
-          subscriptionData?.subscription 
-            ? 'Subscription updated successfully!' 
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: subscriptionData?.subscription
+            ? 'Subscription updated successfully!'
             : 'Subscription created successfully!',
-          [{ text: 'OK' }]
-        );
+        });
       }
     } catch (err) {
       let errorMessage = 'Failed to save subscription. Please try again.';
-      
+
       if (err && typeof err === 'object') {
         if ('data' in err && err.data && typeof err.data === 'object' && 'message' in err.data) {
           errorMessage = err.data.message;
@@ -131,12 +136,12 @@ export default function Subscription() {
           errorMessage = err.message;
         }
       }
-      
-      Alert.alert(
-        'Error',
-        errorMessage,
-        [{ text: 'OK' }]
-      );
+
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMessage,
+      });
     }
   };
 
@@ -145,7 +150,11 @@ export default function Subscription() {
       {/* Custom Header - matching store header style */}
       <View style={[styles.header, { backgroundColor: theme.colors.primary, paddingTop: insets.top }]}>
         <Text style={styles.headerTitle}>Subscriptions</Text>
-        <TouchableOpacity onPress={() => alert('Subscription info')}>
+        <TouchableOpacity onPress={() => Toast.show({
+          type: 'info',
+          text1: 'Subscription Info',
+          text2: 'Choose your daily milk quantity and delivery schedule.'
+        })}>
           <Ionicons name="information-circle-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -164,171 +173,112 @@ export default function Subscription() {
           </Text>
         </View>
       ) : (
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-        {/* Milk Quantity Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            How much milk do you need?
-          </Text>
-          <Text style={[styles.sectionSubtitle, { color: theme.colors.muted }]}>
-            Select your daily quantity
-          </Text>
-          
-          <View style={styles.quantityGrid}>
-            {products && products.length > 0 && products.map((product, index) => {
-              const isSelected = selectedProductId === product.id;
-              // Use quantity as key since it's unique, fallback to index if needed
-              const uniqueKey = product.quantity || `product-${index}`;
-              return (
-                <TouchableOpacity
-                  key={uniqueKey}
-                  style={[
-                    styles.quantityCard,
-                    isSelected && styles.quantityCardSelected,
-                    {
-                      backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
-                      borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
-                    },
-                  ]}
-                  onPress={() => setSelectedProductId(product.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.quantityText,
-                      {
-                        color: isSelected ? theme.colors.primary : theme.colors.text,
-                        fontWeight: isSelected ? '700' : '600',
-                      },
-                    ]}
-                  >
-                    {product.quantity}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.quantityPrice,
-                      {
-                        color: isSelected ? theme.colors.primary : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    ₹{product.price_per_delivery.toFixed(0)}/day
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+          {/* Milk Quantity Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              How much milk do you need?
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.muted }]}>
+              Select your daily quantity
+            </Text>
 
-        {/* Delivery Time Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Preferred delivery time?
-          </Text>
-          <Text style={[styles.sectionSubtitle, { color: theme.colors.muted }]}>
-            Choose when you want your milk
-          </Text>
-          
-          <View style={styles.optionsList}>
-            {DELIVERY_TIMES.map((time) => {
-              const isSelected = selectedTime === time.value;
-              return (
-                <TouchableOpacity
-                  key={time.value}
-                  style={[
-                    styles.optionCard,
-                    isSelected && styles.optionCardSelected,
-                    {
-                      backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
-                      borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
-                    },
-                  ]}
-                  onPress={() => setSelectedTime(time.value)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionContent}>
-                    <View
-                      style={[
-                        styles.radioButton,
+            <View style={styles.quantityGrid}>
+              {products && products.length > 0 && products.map((product, index) => {
+                const isSelected = selectedProductId === product.id;
+                // Use quantity as key since it's unique, fallback to index if needed
+                const uniqueKey = product.quantity || `product-${index}`;
+                return (
+                  <TouchableOpacity
+                    key={uniqueKey}
+                    style={[
+                      styles.quantityCard,
+                      isSelected && styles.quantityCardSelected,
                       {
-                        backgroundColor: isSelected ? theme.colors.primary : 'transparent',
-                        borderColor: isSelected ? theme.colors.primary : '#BDBDBD',
+                        backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
+                        borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
                       },
-                      ]}
-                    >
-                      {isSelected && (
-                        <Ionicons name="checkmark" size={16} color="#fff" />
-                      )}
-                    </View>
-                    <Ionicons
-                      name={time.icon}
-                      size={24}
-                      color={isSelected ? theme.colors.primary : theme.colors.muted}
-                      style={styles.optionIcon}
-                    />
+                    ]}
+                    onPress={() => setSelectedProductId(product.id)}
+                    activeOpacity={0.7}
+                  >
                     <Text
                       style={[
-                        styles.optionLabel,
+                        styles.quantityText,
                         {
-                          color: isSelected ? theme.colors.text : theme.colors.text,
-                          fontWeight: isSelected ? '600' : '500',
+                          color: isSelected ? theme.colors.primary : theme.colors.text,
+                          fontWeight: isSelected ? '700' : '600',
                         },
                       ]}
                     >
-                      {time.label}
+                      {product.quantity}
                     </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Frequency Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            How often?
-          </Text>
-          <Text style={[styles.sectionSubtitle, { color: theme.colors.muted }]}>
-            Choose your delivery frequency
-          </Text>
-          
-          <View style={styles.optionsList}>
-            {FREQUENCY_OPTIONS.map((freq) => {
-              const isSelected = selectedFrequency === freq.value;
-              return (
-                <TouchableOpacity
-                  key={freq.value}
-                  style={[
-                    styles.optionCard,
-                    isSelected && styles.optionCardSelected,
-                    {
-                      backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
-                      borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
-                    },
-                  ]}
-                  onPress={() => setSelectedFrequency(freq.value)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionContent}>
-                    <View
+                    <Text
                       style={[
-                        styles.radioButton,
-                      {
-                        backgroundColor: isSelected ? theme.colors.primary : 'transparent',
-                        borderColor: isSelected ? theme.colors.primary : '#BDBDBD',
-                      },
+                        styles.quantityPrice,
+                        {
+                          color: isSelected ? theme.colors.primary : theme.colors.text,
+                        },
                       ]}
                     >
-                      {isSelected && (
-                        <Ionicons name="checkmark" size={16} color="#fff" />
-                      )}
-                    </View>
-                    <View style={styles.frequencyTextContainer}>
+                      ₹{product.price_per_delivery.toFixed(0)}/day
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Delivery Time Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Preferred delivery time?
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.muted }]}>
+              Choose when you want your milk
+            </Text>
+
+            <View style={styles.optionsList}>
+              {DELIVERY_TIMES.map((time) => {
+                const isSelected = selectedTime === time.value;
+                return (
+                  <TouchableOpacity
+                    key={time.value}
+                    style={[
+                      styles.optionCard,
+                      isSelected && styles.optionCardSelected,
+                      {
+                        backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
+                        borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
+                      },
+                    ]}
+                    onPress={() => setSelectedTime(time.value)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionContent}>
+                      <View
+                        style={[
+                          styles.radioButton,
+                          {
+                            backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+                            borderColor: isSelected ? theme.colors.primary : '#BDBDBD',
+                          },
+                        ]}
+                      >
+                        {isSelected && (
+                          <Ionicons name="checkmark" size={16} color="#fff" />
+                        )}
+                      </View>
+                      <Ionicons
+                        name={time.icon}
+                        size={24}
+                        color={isSelected ? theme.colors.primary : theme.colors.muted}
+                        style={styles.optionIcon}
+                      />
                       <Text
                         style={[
                           styles.optionLabel,
@@ -338,80 +288,139 @@ export default function Subscription() {
                           },
                         ]}
                       >
-                        {freq.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.optionSubtitle,
-                          { color: theme.colors.muted },
-                        ]}
-                      >
-                        {freq.subtitle}
+                        {time.label}
                       </Text>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        </View>
 
-        {/* Summary Card */}
-        <View style={[styles.summaryCard, { backgroundColor: theme.colors.card }]}>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>
-              Price per delivery:
+          {/* Frequency Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              How often?
             </Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              ₹{selectedProduct?.price_per_delivery.toFixed(0) || '0'}
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.muted }]}>
+              Choose your delivery frequency
             </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>
-              Deliveries per month:
-            </Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              {selectedFreqOption?.deliveriesPerMonth || 0}
-            </Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, styles.summaryLabelBold, { color: theme.colors.text }]}>
-              Monthly estimate:
-            </Text>
-            <Text style={[styles.summaryValue, styles.summaryValueBold, { color: theme.colors.primary }]}>
-              ₹{monthlyEstimate.toFixed(0)}
-            </Text>
-          </View>
-        </View>
 
-        {/* Checkout Button */}
-        <Pressable
-          style={[
-            styles.checkoutButton, 
-            { 
-              backgroundColor: theme.colors.primary,
-              opacity: isSaving ? 0.7 : 1,
-            }
-          ]}
-          onPress={handleCheckout}
-          disabled={isSaving}
-          android_ripple={{ color: darkenColor(theme.colors.primary) }}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Ionicons name="cart" size={20} color="#fff" style={styles.checkoutIcon} />
-              <Text style={styles.checkoutButtonText}>
-                {subscriptionData?.subscription ? 'Update Subscription' : 'Proceed to Checkout'}
+            <View style={styles.optionsList}>
+              {FREQUENCY_OPTIONS.map((freq) => {
+                const isSelected = selectedFrequency === freq.value;
+                return (
+                  <TouchableOpacity
+                    key={freq.value}
+                    style={[
+                      styles.optionCard,
+                      isSelected && styles.optionCardSelected,
+                      {
+                        backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
+                        borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
+                      },
+                    ]}
+                    onPress={() => setSelectedFrequency(freq.value)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionContent}>
+                      <View
+                        style={[
+                          styles.radioButton,
+                          {
+                            backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+                            borderColor: isSelected ? theme.colors.primary : '#BDBDBD',
+                          },
+                        ]}
+                      >
+                        {isSelected && (
+                          <Ionicons name="checkmark" size={16} color="#fff" />
+                        )}
+                      </View>
+                      <View style={styles.frequencyTextContainer}>
+                        <Text
+                          style={[
+                            styles.optionLabel,
+                            {
+                              color: isSelected ? theme.colors.text : theme.colors.text,
+                              fontWeight: isSelected ? '600' : '500',
+                            },
+                          ]}
+                        >
+                          {freq.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.optionSubtitle,
+                            { color: theme.colors.muted },
+                          ]}
+                        >
+                          {freq.subtitle}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Summary Card */}
+          <View style={[styles.summaryCard, { backgroundColor: theme.colors.card }]}>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>
+                Price per delivery:
               </Text>
-            </>
-          )}
-        </Pressable>
+              <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+                ₹{selectedProduct?.price_per_delivery.toFixed(0) || '0'}
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>
+                Deliveries per month:
+              </Text>
+              <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+                {selectedFreqOption?.deliveriesPerMonth || 0}
+              </Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, styles.summaryLabelBold, { color: theme.colors.text }]}>
+                Monthly estimate:
+              </Text>
+              <Text style={[styles.summaryValue, styles.summaryValueBold, { color: theme.colors.primary }]}>
+                ₹{monthlyEstimate.toFixed(0)}
+              </Text>
+            </View>
+          </View>
 
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+          {/* Checkout Button */}
+          <Pressable
+            style={[
+              styles.checkoutButton,
+              {
+                backgroundColor: theme.colors.primary,
+                opacity: isSaving ? 0.7 : 1,
+              }
+            ]}
+            onPress={handleCheckout}
+            disabled={isSaving}
+            android_ripple={{ color: darkenColor(theme.colors.primary) }}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="cart" size={20} color="#fff" style={styles.checkoutIcon} />
+                <Text style={styles.checkoutButtonText}>
+                  {subscriptionData?.subscription ? 'Update Subscription' : 'Proceed to Checkout'}
+                </Text>
+              </>
+            )}
+          </Pressable>
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
       )}
     </View>
   );

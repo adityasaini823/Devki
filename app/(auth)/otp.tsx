@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import Toast from 'react-native-toast-message';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, ActivityIndicator, Alert, Modal, Animated } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
@@ -139,10 +140,11 @@ export default function Otp() {
                 }, 2000);
             }
         } catch (error: any) {
-            Alert.alert(
-                'Verification Failed',
-                error?.data?.message || error?.message || 'Invalid OTP. Please check and try again.'
-            );
+            Toast.show({
+                type: 'error',
+                text1: 'Verification Failed',
+                text2: error?.data?.message || error?.message || 'Invalid OTP. Please check and try again.',
+            });
         }
     };
     
@@ -154,10 +156,18 @@ export default function Otp() {
         
         try {
             await sendLoginOTP({ mobile: cleanedPhone }).unwrap();
-            Alert.alert('Success', 'OTP has been resent to ' + phoneNumber);
+            Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: 'OTP has been resent to ' + phoneNumber,
+            });
             setOtp(['', '', '', '']);
         } catch (error: any) {
-            Alert.alert('Error', error?.data?.message || error?.message || 'Failed to resend OTP. Please try again.');
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error?.data?.message || error?.message || 'Failed to resend OTP. Please try again.',
+            });
         }
     };
     

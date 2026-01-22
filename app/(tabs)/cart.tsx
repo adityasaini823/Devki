@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Toast from 'react-native-toast-message';
 import {
   View,
   Text,
@@ -53,10 +54,11 @@ export default function Cart() {
     try {
       await updateQuantity({ id: itemId, quantity: newQuantity }).unwrap();
     } catch (error: any) {
-      Alert.alert(
-        'Error',
-        error?.data?.message || error?.message || 'Failed to update quantity. Please try again.'
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error?.data?.message || error?.message || 'Failed to update quantity.',
+      });
     }
   };
 
@@ -72,11 +74,17 @@ export default function Cart() {
           onPress: async () => {
             try {
               await removeItem(itemId).unwrap();
+              Toast.show({
+                 type: 'success',
+                 text1: 'Item Removed',
+                 text2: 'Item has been removed from your cart.',
+              });
             } catch (error: any) {
-              Alert.alert(
-                'Error',
-                error?.data?.message || error?.message || 'Failed to remove item. Please try again.'
-              );
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error?.data?.message || 'Failed to remove item.',
+              });
             }
           },
         },
@@ -110,7 +118,11 @@ export default function Cart() {
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
-      Alert.alert('Empty Cart', 'Your cart is empty. Add some items to proceed.');
+      Toast.show({
+        type: 'error',
+        text1: 'Empty Cart',
+        text2: 'Your cart is empty. Add some items to proceed.',
+      });
       return;
     }
 
@@ -142,19 +154,13 @@ export default function Cart() {
           onPress: async () => {
             try {
               const result = await checkout().unwrap();
-              Alert.alert(
-                'Order Placed Successfully!',
-                `Order Number: ${result.data.order.order_number}\nTotal: ₹${result.data.order.total_amount.toFixed(2)}\n\nYour order has been confirmed and will be processed soon.`,
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => {
-                      refetchWallet();
-                      router.push('/(tabs)/store');
-                    },
-                  },
-                ]
-              );
+              Toast.show({
+                type: 'success',
+                text1: 'Order Placed!',
+                text2: `Order #${result.data.order.order_number} confirmed.`,
+              });
+              refetchWallet();
+              router.push('/(tabs)/store');
             } catch (error: any) {
               const errorMessage =
                 error?.data?.message ||
@@ -174,7 +180,11 @@ export default function Cart() {
                   ]
                 );
               } else {
-                Alert.alert('Checkout Failed', errorMessage);
+                Toast.show({
+                  type: 'error',
+                  text1: 'Checkout Failed',
+                  text2: errorMessage,
+                });
               }
             }
           },
