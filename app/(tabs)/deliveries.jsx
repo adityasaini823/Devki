@@ -145,7 +145,7 @@ export default function Deliveries() {
                         {formatDate(delivery.scheduled_date)}
                     </Text>
                     <Text style={[styles.deliveryDetails, { color: theme.colors.textSecondary }]}>
-                        {delivery.delivery_time === 'morning' ? '🌅 Morning' : '🌙 Evening'} • {delivery.product_quantity}
+                        {delivery.delivery_time === 'morning' ? '🌅 Morning' : (delivery.delivery_time === 'evening' ? '🌙 Evening' : `🕒 ${delivery.delivery_time}`)} • {delivery.product_quantity}
                     </Text>
                     <Text style={[styles.deliveryPrice, { color: theme.colors.primary }]}>
                         ₹{delivery.price}
@@ -233,7 +233,7 @@ export default function Deliveries() {
                             </View>
                         </View>
                         <Text style={[styles.summaryDetails, { color: theme.colors.textSecondary }]}>
-                            {subscription.delivery_time === 'morning' ? '🌅 Morning' : '🌙 Evening'} delivery • ₹{subscription.price_per_delivery}/delivery
+                            {subscription.delivery_time === 'morning' ? '🌅 Morning' : (subscription.delivery_time === 'evening' ? '🌙 Evening' : `🕒 ${subscription.delivery_time}`)} delivery • ₹{subscription.price_per_delivery}/delivery
                         </Text>
                     </View>
 
