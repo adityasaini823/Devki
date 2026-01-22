@@ -431,9 +431,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginRight: 8,
+    marginVertical: 2,
+    height: 36,
   },
   filterText: {
     fontSize: 14,
+    paddingBottom: 2,
   },
   listContent: {
     padding: 16,
@@ -507,13 +510,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   statusBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    flexShrink: 0,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
   },
   orderItems: {
     marginBottom: 12,
