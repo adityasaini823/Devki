@@ -58,6 +58,20 @@ export default function RootLayout() {
         }}
       />
       <Tabs.Screen
+        name="deliveries"
+        options={{
+          title: "My Deliveries",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "bicycle" : "bicycle-outline"}
+              color={color}
+              size={24}
+            />
+          ),
+          headerShown: false, // Use custom header in component
+        }}
+      />
+      <Tabs.Screen
         name="store"
         options={{
           header: () => <StoreHeader />,
