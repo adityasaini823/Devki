@@ -17,6 +17,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import {
   useGetSubscriptionQuery,
   useCreateOrUpdateSubscriptionMutation,
+  useCancelSubscriptionMutation,
 } from '../../src/redux/api/subscriptionApi';
 import {
   useGetSubscriptionProductsQuery,
@@ -218,6 +219,45 @@ export default function Subscription() {
         text2: errorMessage,
       });
     }
+  };
+
+  const [cancelSubscription, { isLoading: isCancelling }] = useCancelSubscriptionMutation();
+
+  const handleCancelSubscription = () => {
+    Alert.alert(
+      'Cancel Subscription',
+      'Are you sure you want to cancel your subscription? You will stop receiving deliveries from tomorrow.',
+      [
+        {
+          text: 'No, Keep it',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelSubscription().unwrap();
+              Toast.show({
+                type: 'success',
+                text1: 'Subscription Cancelled',
+                text2: 'Your subscription has been cancelled successfully.',
+              });
+              // Reset selection to default
+              if (products.length > 0) {
+                setSelectedProductId(products[0].id);
+              }
+            } catch (error) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'Failed to cancel subscription. Please try again.',
+              });
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -500,6 +540,22 @@ export default function Subscription() {
             )}
           </Pressable>
 
+          {subscriptionData?.subscription && subscriptionData.subscription.status === 'active' && (
+            <TouchableOpacity
+              style={[styles.cancelButton, { opacity: isCancelling ? 0.7 : 1 }]}
+              onPress={handleCancelSubscription}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <ActivityIndicator size="small" color={theme.colors.error} />
+              ) : (
+                <Text style={[styles.cancelButtonText, { color: theme.colors.error }]}>
+                  Cancel Subscription
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+
           <View style={styles.bottomSpacer} />
         </ScrollView>
       )}
@@ -676,6 +732,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  cancelButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   bottomSpacer: {
     height: 20,
