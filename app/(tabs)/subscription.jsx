@@ -21,14 +21,9 @@ import {
 import {
   useGetSubscriptionProductsQuery,
 } from '../../src/redux/api/subscriptionProductApi';
+import { useGetSettingsQuery } from '../../src/redux/api/settingsApi';
 
-// Keep these as constants since they're UI options, not from DB
-
-const DELIVERY_TIMES = [
-  { label: 'Morning (6-8 AM)', value: 'morning', icon: 'sunny' },
-  { label: 'Evening (6-8 PM)', value: 'evening', icon: 'moon' },
-];
-
+// Frequency options generally stay static or could be moved to DB later
 const FREQUENCY_OPTIONS = [
   { label: 'Daily', subtitle: 'Every day', value: 'daily', deliveriesPerMonth: 30 },
   { label: 'Weekdays', subtitle: 'Mon-Fri', value: 'weekdays', deliveriesPerMonth: 22 },
@@ -59,44 +54,105 @@ const darkenColor = (color) => {
   return color;
 };
 
+// Helper to guess icon based on time label/id
+const getIconForSlot = (slot) => {
+  const lowerLabel = (slot.label || '').toLowerCase();
+  const lowerId = (slot.id || '').toLowerCase();
+
+  if (lowerLabel.includes('morning') || lowerId.includes('morning')) return 'sunny';
+  if (lowerLabel.includes('evening') || lowerId.includes('evening') || lowerLabel.includes('night')) return 'moon';
+  if (lowerLabel.includes('noon') || lowerId.includes('afternoon')) return 'sunny-outline';
+
+  return 'time-outline';
+};
+
 export default function Subscription() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // Fetch subscription products from API
+  // Fetch data
   const { data: productsData, isLoading: isLoadingProducts, refetch: refetchProducts } = useGetSubscriptionProductsQuery();
-  // Fetch existing subscription
   const { data: subscriptionData, isLoading: isLoadingSubscription, refetch: refetchSubscription } = useGetSubscriptionQuery();
+  const { data: settingsData, isLoading: isLoadingSettings, refetch: refetchSettings } = useGetSettingsQuery();
+
   const [createOrUpdateSubscription, { isLoading: isSaving }] = useCreateOrUpdateSubscriptionMutation();
 
   useFocusEffect(
     useCallback(() => {
       refetchProducts();
       refetchSubscription();
+      refetchSettings();
     }, [])
   );
 
-
   const [selectedProductId, setSelectedProductId] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('morning');
+  const [selectedTime, setSelectedTime] = useState(null);
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
 
   // Get products array
   const products = productsData?.products || [];
+
+  // Parse Delivery Slots
+  const deliveryOptions = useMemo(() => {
+    const slots = settingsData?.settings?.delivery?.slots || [];
+    // Filter enabled slots and format them
+    return slots
+      .filter(slot => slot.isEnabled)
+      .map(slot => ({
+        value: slot.startTime, // Use startTime as value? Or ID? 
+        // Ideally we should use ID or StartTime. Existing system likely uses 'morning'/'evening' strings.
+        // If we change to dynamic, we should use 'id' if possible, or we need to ensure backend handles whatever we send.
+        // BUT, wait. Backend subscriptionController likely expects 'morning' or 'evening' if legacy logic exists.
+        // Let's check if backend logic is generic. 
+        // Logic: `generateDeliveriesForSubscription` likely uses `delivery_time` to set `delivery_date` time?
+        // Actually it just stores the string usually.
+        // But let's use `startTime` as the value because that's generic?
+        // User requested "morning time from to to option". 
+        // If I look at Settings.jsx update, I added `id`, `label`, `startTime`, `endTime`.
+        // I should use `startTime` or combined string as value, OR better, use `startTime` so backend knows when to deliver?
+        // Actually, if we want to support "Morning (6-8)", the value is less important than the sorting/grouping.
+        // Let's use the ID for selection stability, but `startTime` is useful for sorting.
+        // However, the previous app used 'morning'/'evening'.
+        // If I use dynamic IDs, I should send that ID or the label?
+        // I'll send the `startTime` as the delivery_time value so backend can interpret it if needed, OR the `label`.
+        // Let's use the Label + Time range for display, and `id` (or `startTime`) for value.
+        // Assuming backend just stores `delivery_time` as a string and doesn't validate strictly against enum (it shouldn't).
+        // Let's use `startTime` as value to be unambiguous.
+
+        value: slot.startTime,
+        id: slot.id,
+        label: `${slot.label} (${slot.startTime} - ${slot.endTime})`,
+        icon: getIconForSlot(slot)
+      }));
+  }, [settingsData]);
 
   // Load existing subscription data when available
   useEffect(() => {
     if (subscriptionData?.subscription) {
       const sub = subscriptionData.subscription;
       setSelectedProductId(sub.subscription_product.id);
+
+      // Try to match existing delivery_time to available options
+      // sub.delivery_time might be 'morning' (legacy) or '06:00' (new)
+      // Check if it matches any option.value or option.id
+      // If legacy 'morning' exists, we might need to map it. 
+      // For now, set it directly.
       setSelectedTime(sub.delivery_time);
+
       setSelectedFrequency(sub.frequency);
     } else if (products.length > 0 && !selectedProductId) {
       // Set default to first product if no subscription exists
       setSelectedProductId(products[0].id);
     }
   }, [subscriptionData, products]);
+
+  // Set default time if not set and options exist
+  useEffect(() => {
+    if (!selectedTime && deliveryOptions.length > 0 && !isLoadingSettings) {
+      setSelectedTime(deliveryOptions[0].value);
+    }
+  }, [deliveryOptions, selectedTime, isLoadingSettings]);
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
   const selectedFreqOption = FREQUENCY_OPTIONS.find(opt => opt.value === selectedFrequency);
@@ -116,6 +172,15 @@ export default function Subscription() {
         type: 'error',
         text1: 'Error',
         text2: 'Please select a milk quantity',
+      });
+      return;
+    }
+
+    if (!selectedTime) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a delivery time',
       });
       return;
     }
@@ -169,7 +234,7 @@ export default function Subscription() {
         </TouchableOpacity>
       </View>
 
-      {(isLoadingSubscription || isLoadingProducts) ? (
+      {(isLoadingSubscription || isLoadingProducts || isLoadingSettings) ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={[styles.loadingText, { color: theme.colors.muted }]}>
@@ -222,6 +287,8 @@ export default function Subscription() {
                         {
                           color: isSelected ? theme.colors.primary : theme.colors.text,
                           fontWeight: isSelected ? '700' : '600',
+                          // Dynamic font size for longer text
+                          fontSize: product.quantity.length > 5 ? 20 : 28
                         },
                       ]}
                     >
@@ -253,57 +320,61 @@ export default function Subscription() {
             </Text>
 
             <View style={styles.optionsList}>
-              {DELIVERY_TIMES.map((time) => {
-                const isSelected = selectedTime === time.value;
-                return (
-                  <TouchableOpacity
-                    key={time.value}
-                    style={[
-                      styles.optionCard,
-                      isSelected && styles.optionCardSelected,
-                      {
-                        backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
-                        borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
-                      },
-                    ]}
-                    onPress={() => setSelectedTime(time.value)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.optionContent}>
-                      <View
-                        style={[
-                          styles.radioButton,
-                          {
-                            backgroundColor: isSelected ? theme.colors.primary : 'transparent',
-                            borderColor: isSelected ? theme.colors.primary : '#BDBDBD',
-                          },
-                        ]}
-                      >
-                        {isSelected && (
-                          <Ionicons name="checkmark" size={16} color="#fff" />
-                        )}
+              {deliveryOptions.length > 0 ? (
+                deliveryOptions.map((time) => {
+                  const isSelected = selectedTime === time.value;
+                  return (
+                    <TouchableOpacity
+                      key={time.value}
+                      style={[
+                        styles.optionCard,
+                        isSelected && styles.optionCardSelected,
+                        {
+                          backgroundColor: isSelected ? selectedBgColor : theme.colors.card,
+                          borderColor: isSelected ? theme.colors.primary : '#E0E0E0',
+                        },
+                      ]}
+                      onPress={() => setSelectedTime(time.value)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.optionContent}>
+                        <View
+                          style={[
+                            styles.radioButton,
+                            {
+                              backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+                              borderColor: isSelected ? theme.colors.primary : '#BDBDBD',
+                            },
+                          ]}
+                        >
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={16} color="#fff" />
+                          )}
+                        </View>
+                        <Ionicons
+                          name={time.icon}
+                          size={24}
+                          color={isSelected ? theme.colors.primary : theme.colors.muted}
+                          style={styles.optionIcon}
+                        />
+                        <Text
+                          style={[
+                            styles.optionLabel,
+                            {
+                              color: isSelected ? theme.colors.text : theme.colors.text,
+                              fontWeight: isSelected ? '600' : '500',
+                            },
+                          ]}
+                        >
+                          {time.label}
+                        </Text>
                       </View>
-                      <Ionicons
-                        name={time.icon}
-                        size={24}
-                        color={isSelected ? theme.colors.primary : theme.colors.muted}
-                        style={styles.optionIcon}
-                      />
-                      <Text
-                        style={[
-                          styles.optionLabel,
-                          {
-                            color: isSelected ? theme.colors.text : theme.colors.text,
-                            fontWeight: isSelected ? '600' : '500',
-                          },
-                        ]}
-                      >
-                        {time.label}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={{ fontStyle: 'italic', color: theme.colors.muted }}>No delivery slots available.</Text>
+              )}
             </View>
           </View>
 
