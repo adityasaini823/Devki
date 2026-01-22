@@ -13,7 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
 import WalletHeader from '../components/headers/WalletHeader';
 import {
@@ -67,6 +67,13 @@ export default function Wallet() {
 
   const [addMoney, { isLoading: isAddingMoney }] = useAddMoneyToWalletMutation();
   const [requestWithdrawal, { isLoading: isRequestingWithdrawal }] = useRequestWithdrawalMutation();
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchBalance();
+      refetchTransactions();
+    }, [])
+  );
 
   // Pull to refresh handler
   const onRefresh = useCallback(async () => {

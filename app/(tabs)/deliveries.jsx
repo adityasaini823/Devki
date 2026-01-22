@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../_theme/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
     useGetMyDeliveriesQuery,
     useSkipDeliveryMutation,
@@ -63,9 +63,17 @@ export default function Deliveries() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
 
-    const { data: subscriptionData } = useGetSubscriptionQuery();
-    const { data: deliveriesData, isLoading, isFetching, refetch } = useGetMyDeliveriesQuery({});
+    const { data: subscriptionData, refetch: refetchSubscription } = useGetSubscriptionQuery();
+    const { data: deliveriesData, isLoading, isFetching, refetch: refetchDeliveries } = useGetMyDeliveriesQuery({});
     const [skipDelivery, { isLoading: isSkipping }] = useSkipDeliveryMutation();
+
+    // Refetch data when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            refetchSubscription();
+            refetchDeliveries();
+        }, [])
+    );
 
     const subscription = subscriptionData?.subscription;
     const deliveries = deliveriesData?.deliveries || [];

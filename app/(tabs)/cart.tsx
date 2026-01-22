@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Toast from 'react-native-toast-message';
 import {
   View,
@@ -14,7 +14,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../_theme/ThemeProvider';
 import {
@@ -37,6 +37,13 @@ export default function Cart() {
   const [clearCart, { isLoading: isClearing }] = useClearCartMutation();
   const [checkout, { isLoading: isCheckingOut }] = useCheckoutMutation();
   const { data: walletData, refetch: refetchWallet } = useGetWalletBalanceQuery();
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+      refetchWallet();
+    }, [])
+  );
 
   const cartItems = cartData?.items || [];
   const cartTotal = cartData?.cartTotal || 0;

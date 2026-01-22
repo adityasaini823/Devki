@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Image,
   ScrollView,
@@ -11,7 +11,7 @@ import {
   Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { tokenStorage } from "../../src/utils/tokenStorage";
 import { useTheme } from "../_theme/ThemeProvider";
 import { useGetProductsQuery } from "../../src/redux/api/productApi";
@@ -33,6 +33,13 @@ export default function HomeScreen() {
   const products = productsData?.products || [];
   const featuredProducts = products.slice(0, 4); // Show first 4 products
   const subscription = subscriptionData?.subscription;
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchProducts();
+      refetchSubscription();
+    }, [])
+  );
 
   useEffect(() => {
     const getUser = async () => {

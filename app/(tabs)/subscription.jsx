@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Toast from 'react-native-toast-message';
 import {
   View,
@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../_theme/ThemeProvider';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
   useGetSubscriptionQuery,
   useCreateOrUpdateSubscriptionMutation,
@@ -61,12 +62,21 @@ const darkenColor = (color) => {
 export default function Subscription() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   // Fetch subscription products from API
-  const { data: productsData, isLoading: isLoadingProducts } = useGetSubscriptionProductsQuery();
+  const { data: productsData, isLoading: isLoadingProducts, refetch: refetchProducts } = useGetSubscriptionProductsQuery();
   // Fetch existing subscription
-  const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionQuery();
+  const { data: subscriptionData, isLoading: isLoadingSubscription, refetch: refetchSubscription } = useGetSubscriptionQuery();
   const [createOrUpdateSubscription, { isLoading: isSaving }] = useCreateOrUpdateSubscriptionMutation();
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchProducts();
+      refetchSubscription();
+    }, [])
+  );
+
 
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [selectedTime, setSelectedTime] = useState('morning');

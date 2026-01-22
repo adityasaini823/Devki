@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../_theme/ThemeProvider';
 import {
@@ -36,6 +36,12 @@ export default function Orders() {
     limit: 50,
     status: selectedStatus === 'all' ? undefined : selectedStatus,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [])
+  );
 
   const { data: orderDetailData } = useGetOrderByIdQuery(selectedOrderId || '', {
     skip: !selectedOrderId,
