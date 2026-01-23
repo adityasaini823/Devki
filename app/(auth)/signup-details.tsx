@@ -10,7 +10,6 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    TouchableWithoutFeedback,
     ActivityIndicator,
     Animated,
     Modal,
@@ -38,6 +37,7 @@ interface InputFieldProps {
     maxLength?: number;
     secureTextEntry?: boolean;
     inputRef?: React.RefObject<TextInput | null>;
+    error?: string;
 }
 
 const ModernInput: React.FC<InputFieldProps> = ({
@@ -55,10 +55,17 @@ const ModernInput: React.FC<InputFieldProps> = ({
     maxLength,
     secureTextEntry = false,
     inputRef,
+    error,
 }) => {
     const { theme } = useTheme();
     const [isFocused, setIsFocused] = useState(false);
     const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePress = () => {
+        if (inputRef && 'current' in inputRef && inputRef.current) {
+            inputRef.current.focus();
+        }
+    };
 
     const handleFocus = () => {
         setIsFocused(true);
@@ -80,58 +87,66 @@ const ModernInput: React.FC<InputFieldProps> = ({
     const showLabel = isFocused || hasValue;
 
     return (
-        <Animated.View style={[styles.fieldContainer, { transform: [{ scale: scaleAnim }] }]}>
-            <View style={[
-                styles.inputWrapper,
-                isFocused && [
-                    styles.inputWrapperFocused,
-                    {
-                        borderColor: theme.colors.primary,
-                        shadowColor: theme.colors.primary,
-                    }
-                ]
-            ]}>
-                <View style={styles.iconContainer}>
-                    <Ionicons
-                        name={icon}
-                        size={20}
-                        color={isFocused ? theme.colors.primary : '#9CA3AF'}
-                    />
-                </View>
-                <View style={styles.inputContent}>
-                    {showLabel && (
-                        <Animated.View style={styles.floatingLabel}>
-                            <Text style={[styles.floatingLabelText, { color: theme.colors.primary }]}>
-                                {label} {required && <Text style={styles.required}>*</Text>}
-                            </Text>
-                        </Animated.View>
-                    )}
-                    <TextInput
-                        ref={inputRef as any}
-                        style={[
-                            styles.modernInput,
-                            multiline && styles.modernInputMultiline,
-                            { color: '#111827' },
-                        ]}
-                        placeholder={showLabel ? '' : placeholder}
-                        placeholderTextColor="#9CA3AF"
-                        value={value}
-                        onChangeText={onChangeText}
-                        onFocus={handleFocus}
-                        onBlur={handleBlur}
-                        keyboardType={keyboardType}
-                        autoCapitalize={autoCapitalize}
-                        returnKeyType={returnKeyType}
-                        onSubmitEditing={onSubmitEditing}
-                        multiline={multiline}
-                        numberOfLines={multiline ? 3 : 1}
-                        textAlignVertical={multiline ? 'top' : 'center'}
-                        maxLength={maxLength}
-                        secureTextEntry={secureTextEntry}
-                    />
-                </View>
-            </View>
-        </Animated.View>
+        <View style={styles.fieldContainer}>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={handlePress}
+                    style={[
+                        styles.inputWrapper,
+                        isFocused && [
+                            styles.inputWrapperFocused,
+                            {
+                                borderColor: theme.colors.primary,
+                                shadowColor: theme.colors.primary,
+                            }
+                        ],
+                        error && { borderColor: '#EF4444', backgroundColor: '#FEF2F2' }
+                    ]}
+                >
+                    <View style={styles.iconContainer}>
+                        <Ionicons
+                            name={icon}
+                            size={20}
+                            color={error ? '#EF4444' : (isFocused ? theme.colors.primary : '#9CA3AF')}
+                        />
+                    </View>
+                    <View style={styles.inputContent}>
+                        {showLabel && (
+                            <View style={styles.floatingLabel}>
+                                <Text style={[styles.floatingLabelText, { color: error ? '#EF4444' : theme.colors.primary }]}>
+                                    {label} {required && <Text style={styles.required}>*</Text>}
+                                </Text>
+                            </View>
+                        )}
+                        <TextInput
+                            ref={inputRef as any}
+                            style={[
+                                styles.modernInput,
+                                multiline && styles.modernInputMultiline,
+                                { color: '#111827' },
+                            ]}
+                            placeholder={showLabel ? '' : placeholder}
+                            placeholderTextColor="#9CA3AF"
+                            value={value}
+                            onChangeText={onChangeText}
+                            onFocus={handleFocus}
+                            onBlur={handleBlur}
+                            keyboardType={keyboardType}
+                            autoCapitalize={autoCapitalize}
+                            returnKeyType={returnKeyType}
+                            onSubmitEditing={onSubmitEditing}
+                            multiline={multiline}
+                            numberOfLines={multiline ? 3 : 1}
+                            textAlignVertical={multiline ? 'top' : 'center'}
+                            maxLength={maxLength}
+                            secureTextEntry={secureTextEntry}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </Animated.View>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
     );
 };
 
@@ -151,20 +166,26 @@ export default function SignupDetails() {
     const [pincode, setPincode] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
 
+    // Error state
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
     const [completeProfile, { isLoading }] = useCompleteProfileMutation();
 
-    // Animations
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(20)).current;
-    const successScaleAnim = useRef(new Animated.Value(0)).current;
-    const checkmarkAnim = useRef(new Animated.Value(0)).current;
-
+    // Refs
+    const scrollRef = useRef<ScrollView>(null);
+    const firstNameRef = useRef<TextInput>(null);
     const lastNameRef = useRef<TextInput>(null);
     const emailRef = useRef<TextInput>(null);
     const addressRef = useRef<TextInput>(null);
     const cityRef = useRef<TextInput>(null);
     const stateRef = useRef<TextInput>(null);
     const pincodeRef = useRef<TextInput>(null);
+
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+    const successScaleAnim = useRef(new Animated.Value(0)).current;
+    const checkmarkAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         Animated.parallel([
@@ -181,14 +202,47 @@ export default function SignupDetails() {
         ]).start();
     }, []);
 
-    const isFormValid = () => {
-        return (
-            firstName.trim().length >= 2 &&
-            address.trim().length >= 5 &&
-            city.trim().length >= 2 &&
-            state.trim().length >= 2 &&
-            pincode.trim().length === 6
-        );
+    const validateForm = () => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!firstName.trim()) {
+            newErrors.firstName = 'First name is required';
+        } else if (firstName.trim().length < 2) {
+            newErrors.firstName = 'Name must be at least 2 characters';
+        }
+
+        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            newErrors.email = 'Please enter a valid email address';
+        }
+
+        if (!address.trim()) {
+            newErrors.address = 'Full address is required';
+        } else if (address.trim().length < 5) {
+            newErrors.address = 'Please enter a more detailed address';
+        }
+
+        if (!city.trim()) {
+            newErrors.city = 'City is required';
+        }
+
+        if (!state.trim()) {
+            newErrors.state = 'State is required';
+        }
+
+        if (!pincode.trim()) {
+            newErrors.pincode = 'Pincode is required';
+        } else if (pincode.trim().length !== 6) {
+            newErrors.pincode = 'Pincode must be exactly 6 digits';
+        }
+
+        setErrors(newErrors);
+
+        if (Object.keys(newErrors).length > 0) {
+            // Scroll to top to show errors
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+            return false;
+        }
+        return true;
     };
 
     const completedFields = [
@@ -202,11 +256,11 @@ export default function SignupDetails() {
     const progress = (completedFields / 5) * 100;
 
     const handleSubmit = async () => {
-        if (!isFormValid()) {
+        if (!validateForm()) {
             Toast.show({
                 type: 'error',
-                text1: 'Almost There!',
-                text2: 'Please complete all required fields to continue.',
+                text1: 'Validation Error',
+                text2: 'Please check the highlighted fields.',
             });
             return;
         }
@@ -267,8 +321,8 @@ export default function SignupDetails() {
 
             <KeyboardAvoidingView
                 style={styles.keyboardView}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 {/* Fixed Header */}
                 <View style={styles.header}>
@@ -289,6 +343,7 @@ export default function SignupDetails() {
                 </View>
 
                 <ScrollView
+                    ref={scrollRef}
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
@@ -317,15 +372,24 @@ export default function SignupDetails() {
                             </View>
 
                             <ModernInput
+                                inputRef={firstNameRef}
                                 icon="person-outline"
                                 label="First Name"
                                 value={firstName}
-                                onChangeText={setFirstName}
+                                onChangeText={(val) => {
+                                    setFirstName(val);
+                                    if (errors.firstName) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.firstName;
+                                        return n;
+                                    });
+                                }}
                                 placeholder="e.g. Rahul"
                                 required
                                 autoCapitalize="words"
                                 returnKeyType="next"
                                 onSubmitEditing={() => lastNameRef.current?.focus()}
+                                error={errors.firstName}
                             />
 
                             <ModernInput
@@ -345,11 +409,19 @@ export default function SignupDetails() {
                                 icon="mail-outline"
                                 label="Email"
                                 value={email}
-                                onChangeText={setEmail}
+                                onChangeText={(val) => {
+                                    setEmail(val);
+                                    if (errors.email) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.email;
+                                        return n;
+                                    });
+                                }}
                                 placeholder="e.g. rahul@example.com (Optional)"
                                 keyboardType="email-address"
                                 returnKeyType="next"
                                 onSubmitEditing={() => addressRef.current?.focus()}
+                                error={errors.email}
                             />
                         </View>
 
@@ -364,12 +436,20 @@ export default function SignupDetails() {
                                 icon="home-outline"
                                 label="Full Address"
                                 value={address}
-                                onChangeText={setAddress}
+                                onChangeText={(val) => {
+                                    setAddress(val);
+                                    if (errors.address) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.address;
+                                        return n;
+                                    });
+                                }}
                                 placeholder="House No, Building, Street..."
                                 required
                                 multiline
                                 returnKeyType="next"
                                 onSubmitEditing={() => cityRef.current?.focus()}
+                                error={errors.address}
                             />
 
                             <View style={styles.row}>
@@ -379,12 +459,20 @@ export default function SignupDetails() {
                                         icon="business-outline"
                                         label="City"
                                         value={city}
-                                        onChangeText={setCity}
+                                        onChangeText={(val) => {
+                                            setCity(val);
+                                            if (errors.city) setErrors(prev => {
+                                                const n = { ...prev };
+                                                delete n.city;
+                                                return n;
+                                            });
+                                        }}
                                         placeholder="City"
                                         required
                                         autoCapitalize="words"
                                         returnKeyType="next"
                                         onSubmitEditing={() => stateRef.current?.focus()}
+                                        error={errors.city}
                                     />
                                 </View>
                                 <View style={styles.halfWidth}>
@@ -393,12 +481,20 @@ export default function SignupDetails() {
                                         icon="map-outline"
                                         label="State"
                                         value={state}
-                                        onChangeText={setState}
+                                        onChangeText={(val) => {
+                                            setState(val);
+                                            if (errors.state) setErrors(prev => {
+                                                const n = { ...prev };
+                                                delete n.state;
+                                                return n;
+                                            });
+                                        }}
                                         placeholder="State"
                                         required
                                         autoCapitalize="words"
                                         returnKeyType="next"
                                         onSubmitEditing={() => pincodeRef.current?.focus()}
+                                        error={errors.state}
                                     />
                                 </View>
                             </View>
@@ -408,26 +504,32 @@ export default function SignupDetails() {
                                 icon="pin-outline"
                                 label="Pincode"
                                 value={pincode}
-                                onChangeText={(text) => setPincode(formatPincode(text))}
+                                onChangeText={(text) => {
+                                    setPincode(formatPincode(text));
+                                    if (errors.pincode) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.pincode;
+                                        return n;
+                                    });
+                                }}
                                 placeholder="6-digit Pincode"
                                 required
                                 keyboardType="number-pad"
                                 maxLength={6}
                                 returnKeyType="done"
                                 onSubmitEditing={handleSubmit}
+                                error={errors.pincode}
                             />
                         </View>
 
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
-                                isFormValid() && !isLoading && [
-                                    styles.submitButtonActive,
-                                    { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }
-                                ],
+                                { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
+                                isLoading && { opacity: 0.7 }
                             ]}
                             onPress={handleSubmit}
-                            disabled={!isFormValid() || isLoading}
+                            disabled={isLoading}
                             activeOpacity={0.8}
                         >
                             {isLoading ? (
@@ -443,6 +545,9 @@ export default function SignupDetails() {
                         <Text style={styles.helperText}>
                             By creating an account, you agree to our terms and privacy policy.
                         </Text>
+
+                        {/* Extra space for scrolling on small screens with keyboard */}
+                        <View style={{ height: 100 }} />
                     </Animated.View>
                 </ScrollView>
 
@@ -519,7 +624,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 24,
-        paddingBottom: 40,
+        paddingBottom: 100, // Increased for better keyboard handling
     },
     content: {
         width: '100%',
@@ -629,25 +734,30 @@ const styles = StyleSheet.create({
         minHeight: 60,
         paddingTop: 8,
     },
+    errorText: {
+        color: '#EF4444',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 4,
+        marginLeft: 4,
+    },
     row: {
         flexDirection: 'row',
-        gap: 12,
+        width: '100%',
+        justifyContent: 'space-between',
     },
     halfWidth: {
-        flex: 1,
+        width: '48%',
     },
     submitButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#D1D5DB',
         borderRadius: 18,
         height: 64,
         marginTop: 12,
         marginBottom: 16,
         gap: 10,
-    },
-    submitButtonActive: {
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.2,
         shadowRadius: 12,
