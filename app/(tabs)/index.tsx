@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Pressable,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { tokenStorage } from "../../src/utils/tokenStorage";
@@ -90,16 +91,38 @@ export default function HomeScreen() {
     >
       {/* Hero Section */}
       <View style={styles.heroContainer}>
-        <Image
-          source={{
-            uri: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800",
-          }}
-          style={styles.heroImage}
-        />
-        <View style={styles.heroOverlay}>
-          <Text style={styles.heroTitle}>Welcome {user?.first_name || "Back"}!</Text>
-          <Text style={styles.heroSubtitle}>Your fresh milk delivery partner</Text>
-        </View>
+        <LinearGradient
+          colors={[theme.colors.primary, lightenColor(theme.colors.primary, 0.8)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroGradient}
+        >
+          <View style={styles.heroContent}>
+            <View style={styles.heroTextContainer}>
+              <Text style={styles.heroGreeting}>Hello,</Text>
+              <Text style={styles.heroTitle}>{user?.first_name || "Milk Mate"}!</Text>
+              <Text style={styles.heroSubtitle}>Your fresh farm milk is just a tap away.</Text>
+
+              <TouchableOpacity
+                style={styles.heroCTA}
+                onPress={() => router.push("/(tabs)/deliveries")}
+              >
+                <Text style={[styles.heroCTAText, { color: theme.colors.primary }]}>View Deliveries</Text>
+                <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.heroIconContainer}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="water" size={60} color="rgba(255,255,255,0.3)" />
+              </View>
+            </View>
+          </View>
+
+          {/* Abstract Shapes for Texture */}
+          <View style={[styles.abstractShape, styles.shape1]} />
+          <View style={[styles.abstractShape, styles.shape2]} />
+        </LinearGradient>
       </View>
 
       {/* Quick Navigation Cards */}
@@ -296,40 +319,92 @@ const lightenColor = (color: string, opacity = 0.1) => {
 };
 
 const styles = StyleSheet.create({
-    container: {
+  container: {
     flex: 1,
   },
   heroContainer: {
-    position: "relative",
-    height: 200,
-    marginBottom: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 24,
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
   },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  heroGradient: {
+    padding: 24,
+    minHeight: 180,
   },
-  heroOverlay: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
+  heroContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  heroTextContainer: {
+    flex: 1,
+  },
+  heroGreeting: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.8)",
+    fontWeight: "600",
   },
   heroTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "800",
     color: "#fff",
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    marginBottom: 8,
   },
   heroSubtitle: {
     fontSize: 14,
-    color: "#fff",
-    marginTop: 4,
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    color: "rgba(255,255,255,0.9)",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  heroCTA: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+  },
+  heroCTAText: {
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  heroIconContainer: {
+    marginLeft: 16,
+  },
+  iconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  abstractShape: {
+    position: "absolute",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 100,
+  },
+  shape1: {
+    width: 200,
+    height: 200,
+    top: -100,
+    right: -100,
+  },
+  shape2: {
+    width: 150,
+    height: 150,
+    bottom: -75,
+    left: -75,
   },
   quickNavContainer: {
     flexDirection: "row",

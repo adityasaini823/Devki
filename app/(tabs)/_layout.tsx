@@ -115,8 +115,7 @@ export default function RootLayout() {
         options={{
           title: "Cart",
           href: null,
-          // tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
-          headerShown: false, // Use custom header in component
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -124,8 +123,7 @@ export default function RootLayout() {
         options={{
           title: "Wallet",
           href: null,
-          // tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
-          headerShown: false, // Use custom header in component
+          headerShown: false,
         }}
       />
     </Tabs>
