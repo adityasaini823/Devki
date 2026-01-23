@@ -18,10 +18,10 @@ export default function RootLayout() {
         tabBarStyle: {
           backgroundColor: theme.colors.card,
           borderTopWidth: 0,
-          height: 64,
+          height: 72, // Increased height
         },
         tabBarItemStyle: {
-          paddingVertical: 8,
+          paddingVertical: 12, // Increased padding
         },
       }}
     >
@@ -32,7 +32,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "home-sharp" : "home-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: true,
@@ -51,7 +51,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "water-sharp" : "water-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: false, // Hide default header since we have custom header
@@ -65,7 +65,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "bicycle" : "bicycle-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: false, // Use custom header in component
@@ -79,7 +79,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "storefront-sharp" : "storefront-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: true,
@@ -93,7 +93,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "receipt-sharp" : "receipt-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: true,
@@ -105,7 +105,7 @@ export default function RootLayout() {
           title: "Profile",
           tabBarLabel: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person-sharp" : "person-outline"} color={color} size={24} />
+            <Ionicons name={focused ? "person-sharp" : "person-outline"} color={color} size={28} />
           ),
           headerShown: true,
         }}

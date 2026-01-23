@@ -113,10 +113,10 @@ export default function HomeScreen() {
 
               <TouchableOpacity
                 style={styles.heroCTA}
-                onPress={() => router.push("/(tabs)/store")}
+                onPress={() => router.push("/(tabs)/wallet")}
               >
-                <Text style={[styles.heroCTAText, { color: theme.colors.primary }]}>Order something good now</Text>
-                <Ionicons name="cart" size={16} color={theme.colors.primary} />
+                <Text style={[styles.heroCTAText, { color: theme.colors.primary }]}>Top Up</Text>
+                <Ionicons name="wallet" size={16} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
 
@@ -141,10 +141,9 @@ export default function HomeScreen() {
           activeOpacity={0.7}
         >
           <View style={[styles.quickNavIconContainer, { backgroundColor: lightenColor(theme.colors.primary, 0.2) }]}>
-            <Ionicons name="water" size={24} color={theme.colors.primary} />
+            <Ionicons name="calendar" size={24} color={theme.colors.primary} />
           </View>
-          <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Subscriptions</Text>
-          <Text style={[styles.quickNavSubtitle, { color: theme.colors.muted }]}>Manage your plan</Text>
+          <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Subscribe</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -156,7 +155,6 @@ export default function HomeScreen() {
             <Ionicons name="storefront" size={24} color={theme.colors.primary} />
           </View>
           <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Store</Text>
-          <Text style={[styles.quickNavSubtitle, { color: theme.colors.muted }]}>Browse products</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -168,7 +166,17 @@ export default function HomeScreen() {
             <Ionicons name="receipt" size={24} color={theme.colors.primary} />
           </View>
           <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Orders</Text>
-          <Text style={[styles.quickNavSubtitle, { color: theme.colors.muted }]}>Track orders</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.quickNavCard, { backgroundColor: theme.colors.card }]}
+          onPress={() => alert('Support feature coming soon!')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.quickNavIconContainer, { backgroundColor: lightenColor(theme.colors.primary, 0.2) }]}>
+            <Ionicons name="headset" size={24} color={theme.colors.primary} />
+          </View>
+          <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Support</Text>
         </TouchableOpacity>
       </View>
 
@@ -419,12 +427,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     marginBottom: 24,
-    gap: 12,
+    gap: 8, // Reduced gap
   },
   quickNavCard: {
     flex: 1,
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 12, // Reduced vertical padding
+    paddingHorizontal: 4, // Minimal horizontal padding
     alignItems: "center",
     shadowColor: "#000",
     shadowOpacity: 0.08,
@@ -432,22 +441,21 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   quickNavIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44, // Slightly smaller
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
   },
   quickNavTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
+    fontSize: 11, // Reduced font size to prevent wrapping
+    fontWeight: "700",
+    marginBottom: 0,
     textAlign: "center",
   },
   quickNavSubtitle: {
-    fontSize: 11,
-    textAlign: "center",
+    display: 'none', // Hide subtitles to save space and clean up UI as per design
   },
   section: {
     marginBottom: 24,
