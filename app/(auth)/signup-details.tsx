@@ -19,6 +19,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useCompleteProfileMutation } from '../../src/redux/api/authApi';
 import { tokenStorage } from '../../src/utils/tokenStorage';
 
@@ -81,7 +82,7 @@ const ModernInput: React.FC<InputFieldProps> = ({
     return (
         <Animated.View style={[styles.inputContainer, { transform: [{ scale: scaleAnim }] }]}>
             <View style={[
-                styles.inputWrapper, 
+                styles.inputWrapper,
                 isFocused && [
                     styles.inputWrapperFocused,
                     {
@@ -138,9 +139,9 @@ export default function SignupDetails() {
     const router = useRouter();
     const { theme } = useTheme();
     const params = useLocalSearchParams();
-    
+
     const phoneNumber = (params.phone as string) || '';
-    
+
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
@@ -149,12 +150,12 @@ export default function SignupDetails() {
     const [state, setState] = useState('');
     const [pincode, setPincode] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
-    
+
     const [completeProfile, { isLoading }] = useCompleteProfileMutation();
-    
+
     const scaleAnim = useRef(new Animated.Value(0)).current;
     const checkmarkAnim = useRef(new Animated.Value(0)).current;
-    
+
     const firstNameRef = useRef<TextInput>(null);
     const lastNameRef = useRef<TextInput>(null);
     const emailRef = useRef<TextInput>(null);
@@ -162,7 +163,7 @@ export default function SignupDetails() {
     const cityRef = useRef<TextInput>(null);
     const stateRef = useRef<TextInput>(null);
     const pincodeRef = useRef<TextInput>(null);
-    
+
     const isFormValid = () => {
         return (
             firstName.trim().length >= 2 &&
@@ -172,7 +173,7 @@ export default function SignupDetails() {
             pincode.trim().length === 6
         );
     };
-    
+
     const completedFields = [
         firstName.trim().length >= 2,
         address.trim().length >= 5,
@@ -180,9 +181,9 @@ export default function SignupDetails() {
         state.trim().length >= 2,
         pincode.trim().length === 6,
     ].filter(Boolean).length;
-    
+
     const progress = (completedFields / 5) * 100;
-    
+
     const handleSubmit = async () => {
         if (!isFormValid()) {
             Toast.show({
@@ -192,9 +193,9 @@ export default function SignupDetails() {
             });
             return;
         }
-        
+
         Keyboard.dismiss();
-        
+
         try {
             const response = await completeProfile({
                 mobile: phoneNumber.replace(/\D/g, ''),
@@ -206,7 +207,7 @@ export default function SignupDetails() {
                 state: state.trim(),
                 pincode: pincode.trim(),
             }).unwrap();
-            
+
             // Store tokens and user data
             if (response.token) {
                 await tokenStorage.saveToken(response.token);
@@ -217,10 +218,10 @@ export default function SignupDetails() {
             if (response.user) {
                 await tokenStorage.saveUser(response.user);
             }
-            
+
             // Show success confirmation
             setShowSuccess(true);
-            
+
             // Animate success modal
             Animated.sequence([
                 Animated.spring(scaleAnim, {
@@ -235,7 +236,7 @@ export default function SignupDetails() {
                     useNativeDriver: true,
                 }),
             ]).start();
-            
+
             // Navigate to home after 2 seconds
             setTimeout(() => {
                 router.replace('/(tabs)');
@@ -248,12 +249,12 @@ export default function SignupDetails() {
             });
         }
     };
-    
+
     const formatPincode = (text: string) => {
         const cleaned = text.replace(/\D/g, '');
         return cleaned.slice(0, 6);
     };
-    
+
     return (
         <KeyboardAvoidingView
             style={styles.keyboardView}
@@ -273,7 +274,7 @@ export default function SignupDetails() {
                         <Text style={styles.headerTitle}>Complete Profile</Text>
                         <View style={styles.placeholder} />
                     </View>
-                    
+
                     <View style={styles.progressContainer}>
                         <View style={styles.progressBar}>
                             <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.colors.primary }]} />
@@ -283,31 +284,39 @@ export default function SignupDetails() {
                         </Text>
                     </View>
                 </View>
-                
+
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.content}>
+                        {/* Logo Section */}
+                        <View style={styles.logoContainer}>
+                            <View style={styles.logoWrapper}>
+                                <Image
+                                    source={require('../../assets/images/devki-logo.png')}
+                                    style={styles.logo}
+                                    contentFit="contain"
+                                />
+                            </View>
+                        </View>
+
                         {/* Welcome Section */}
                         <View style={styles.welcomeSection}>
-                            <View style={styles.avatarContainer}>
-                                <Ionicons name="person" size={40} color={theme.colors.primary} />
-                            </View>
                             <Text style={styles.welcomeTitle}>Let's get you set up!</Text>
                             <Text style={styles.welcomeSubtitle}>
                                 We need a few details to personalize your experience
                             </Text>
                         </View>
-                        
+
                         {/* Personal Info Card */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
                                 <Ionicons name="person-circle-outline" size={24} color={theme.colors.primary} />
                                 <Text style={styles.cardTitle}>Personal Information</Text>
                             </View>
-                            
+
                             <ModernInput
                                 icon="person-outline"
                                 label="First Name"
@@ -319,7 +328,7 @@ export default function SignupDetails() {
                                 returnKeyType="next"
                                 onSubmitEditing={() => lastNameRef.current?.focus()}
                             />
-                            
+
                             <ModernInput
                                 inputRef={lastNameRef}
                                 icon="person-outline"
@@ -331,7 +340,7 @@ export default function SignupDetails() {
                                 returnKeyType="next"
                                 onSubmitEditing={() => emailRef.current?.focus()}
                             />
-                            
+
                             <ModernInput
                                 inputRef={emailRef}
                                 icon="mail-outline"
@@ -344,14 +353,14 @@ export default function SignupDetails() {
                                 onSubmitEditing={() => addressRef.current?.focus()}
                             />
                         </View>
-                        
+
                         {/* Address Info Card */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
                                 <Ionicons name="location-outline" size={24} color={theme.colors.primary} />
                                 <Text style={styles.cardTitle}>Delivery Address</Text>
                             </View>
-                            
+
                             <ModernInput
                                 inputRef={addressRef}
                                 icon="home-outline"
@@ -364,7 +373,7 @@ export default function SignupDetails() {
                                 returnKeyType="next"
                                 onSubmitEditing={() => cityRef.current?.focus()}
                             />
-                            
+
                             <View style={styles.row}>
                                 <View style={styles.halfWidth}>
                                     <ModernInput
@@ -380,7 +389,7 @@ export default function SignupDetails() {
                                         onSubmitEditing={() => stateRef.current?.focus()}
                                     />
                                 </View>
-                                
+
                                 <View style={styles.halfWidth}>
                                     <ModernInput
                                         inputRef={stateRef}
@@ -396,7 +405,7 @@ export default function SignupDetails() {
                                     />
                                 </View>
                             </View>
-                            
+
                             <ModernInput
                                 inputRef={pincodeRef}
                                 icon="pin-outline"
@@ -411,7 +420,7 @@ export default function SignupDetails() {
                                 onSubmitEditing={handleSubmit}
                             />
                         </View>
-                        
+
                         {/* Submit Button */}
                         <TouchableOpacity
                             style={[
@@ -437,19 +446,19 @@ export default function SignupDetails() {
                                 </>
                             )}
                         </TouchableOpacity>
-                        
+
                         <Text style={styles.helperText}>
                             By continuing, you agree to our Terms of Service and Privacy Policy
                         </Text>
                     </View>
                 </ScrollView>
-                
+
                 {/* Success Confirmation Modal */}
                 <Modal
                     visible={showSuccess}
                     transparent
                     animationType="fade"
-                    onRequestClose={() => {}}
+                    onRequestClose={() => { }}
                 >
                     <View style={styles.modalOverlay}>
                         <Animated.View
@@ -478,12 +487,12 @@ export default function SignupDetails() {
                             >
                                 <Ionicons name="checkmark" size={60} color="#FFFFFF" />
                             </Animated.View>
-                            
+
                             <Text style={styles.successTitle}>Profile Created!</Text>
                             <Text style={styles.successMessage}>
                                 Your profile has been successfully created. Welcome to Devki!
                             </Text>
-                            
+
                             <View style={styles.successLoader}>
                                 <ActivityIndicator size="small" color={theme.colors.primary} />
                             </View>
@@ -562,6 +571,26 @@ const styles = StyleSheet.create({
     welcomeSection: {
         alignItems: 'center',
         marginBottom: 32,
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    logoWrapper: {
+        width: 80,
+        height: 80,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    logo: {
+        width: '100%',
+        height: '100%',
     },
     avatarContainer: {
         width: 80,
