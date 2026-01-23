@@ -18,6 +18,7 @@ import { useTheme } from "../_theme/ThemeProvider";
 import { useGetProductsQuery } from "../../src/redux/api/productApi";
 import { useGetSubscriptionQuery } from "../../src/redux/api/subscriptionApi";
 import { useAddOrUpdateCartItemMutation } from "../../src/redux/api/cartApi";
+import { useGetWalletBalanceQuery } from "../../src/redux/api/walletApi";
 
 export default function HomeScreen() {
   const { theme } = useTheme();
@@ -29,16 +30,19 @@ export default function HomeScreen() {
   // Fetch data
   const { data: productsData, isLoading: isLoadingProducts, refetch: refetchProducts } = useGetProductsQuery();
   const { data: subscriptionData, isLoading: isLoadingSubscription, refetch: refetchSubscription } = useGetSubscriptionQuery();
+  const { data: balanceData, refetch: refetchWallet } = useGetWalletBalanceQuery();
   const [addOrUpdateCartItem] = useAddOrUpdateCartItemMutation();
 
   const products = productsData?.products || [];
   const featuredProducts = products.slice(0, 4); // Show first 4 products
   const subscription = subscriptionData?.subscription;
+  const balance = balanceData?.balance || 0;
 
   useFocusEffect(
     useCallback(() => {
       refetchProducts();
       refetchSubscription();
+      refetchWallet();
     }, [])
   );
 
@@ -52,9 +56,10 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchProducts(), refetchSubscription()]);
+    await Promise.all([refetchProducts(), refetchSubscription(), refetchWallet()]);
     setRefreshing(false);
   };
+  // ... (keep existing handler functions)
 
   const handleAddToCart = async (productId: string, productName: string) => {
     setAddingProductId(productId);
@@ -99,16 +104,19 @@ export default function HomeScreen() {
         >
           <View style={styles.heroContent}>
             <View style={styles.heroTextContainer}>
-              <Text style={styles.heroGreeting}>Hello,</Text>
-              <Text style={styles.heroTitle}>{user?.first_name || "Milk Mate"}!</Text>
-              <Text style={styles.heroSubtitle}>Your fresh farm milk is just a tap away.</Text>
+              <Text style={styles.heroGreeting}>Hello, {user?.first_name || "Milk Mate"}!</Text>
+
+              <View style={{ marginVertical: 12 }}>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600' }}>Wallet Balance</Text>
+                <Text style={{ fontSize: 32, color: '#fff', fontWeight: '800' }}>₹{balance.toFixed(2)}</Text>
+              </View>
 
               <TouchableOpacity
                 style={styles.heroCTA}
-                onPress={() => router.push("/(tabs)/deliveries")}
+                onPress={() => router.push("/(tabs)/store")}
               >
-                <Text style={[styles.heroCTAText, { color: theme.colors.primary }]}>View Deliveries</Text>
-                <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+                <Text style={[styles.heroCTAText, { color: theme.colors.primary }]}>Order something good now</Text>
+                <Ionicons name="cart" size={16} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
 
