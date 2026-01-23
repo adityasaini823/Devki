@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import {
     View,
@@ -12,7 +12,6 @@ import {
     ScrollView,
     TouchableWithoutFeedback,
     ActivityIndicator,
-    Alert,
     Animated,
     Modal,
 } from 'react-native';
@@ -20,6 +19,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCompleteProfileMutation } from '../../src/redux/api/authApi';
 import { tokenStorage } from '../../src/utils/tokenStorage';
 
@@ -80,7 +80,7 @@ const ModernInput: React.FC<InputFieldProps> = ({
     const showLabel = isFocused || hasValue;
 
     return (
-        <Animated.View style={[styles.inputContainer, { transform: [{ scale: scaleAnim }] }]}>
+        <Animated.View style={[styles.fieldContainer, { transform: [{ scale: scaleAnim }] }]}>
             <View style={[
                 styles.inputWrapper,
                 isFocused && [
@@ -107,7 +107,7 @@ const ModernInput: React.FC<InputFieldProps> = ({
                         </Animated.View>
                     )}
                     <TextInput
-                        ref={inputRef}
+                        ref={inputRef as any}
                         style={[
                             styles.modernInput,
                             multiline && styles.modernInputMultiline,
@@ -153,16 +153,33 @@ export default function SignupDetails() {
 
     const [completeProfile, { isLoading }] = useCompleteProfileMutation();
 
-    const scaleAnim = useRef(new Animated.Value(0)).current;
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+    const successScaleAnim = useRef(new Animated.Value(0)).current;
     const checkmarkAnim = useRef(new Animated.Value(0)).current;
 
-    const firstNameRef = useRef<TextInput>(null);
     const lastNameRef = useRef<TextInput>(null);
     const emailRef = useRef<TextInput>(null);
     const addressRef = useRef<TextInput>(null);
     const cityRef = useRef<TextInput>(null);
     const stateRef = useRef<TextInput>(null);
     const pincodeRef = useRef<TextInput>(null);
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 800,
+                useNativeDriver: true,
+            })
+        ]).start();
+    }, []);
 
     const isFormValid = () => {
         return (
@@ -208,23 +225,13 @@ export default function SignupDetails() {
                 pincode: pincode.trim(),
             }).unwrap();
 
-            // Store tokens and user data
-            if (response.token) {
-                await tokenStorage.saveToken(response.token);
-            }
-            if (response.refreshToken) {
-                await tokenStorage.saveRefreshToken(response.refreshToken);
-            }
-            if (response.user) {
-                await tokenStorage.saveUser(response.user);
-            }
+            if (response.token) await tokenStorage.saveToken(response.token);
+            if (response.refreshToken) await tokenStorage.saveRefreshToken(response.refreshToken);
+            if (response.user) await tokenStorage.saveUser(response.user);
 
-            // Show success confirmation
             setShowSuccess(true);
-
-            // Animate success modal
             Animated.sequence([
-                Animated.spring(scaleAnim, {
+                Animated.spring(successScaleAnim, {
                     toValue: 1,
                     useNativeDriver: true,
                     tension: 50,
@@ -237,41 +244,39 @@ export default function SignupDetails() {
                 }),
             ]).start();
 
-            // Navigate to home after 2 seconds
             setTimeout(() => {
                 router.replace('/(tabs)');
             }, 2000);
         } catch (error: any) {
             Toast.show({
                 type: 'error',
-                text1: 'Error',
-                text2: error?.data?.message || error?.message || 'Failed to complete profile. Please check your connection and try again.',
+                text1: 'Setup Failed',
+                text2: error?.data?.message || error?.message || 'Failed to complete profile. Try again.',
             });
         }
     };
 
-    const formatPincode = (text: string) => {
-        const cleaned = text.replace(/\D/g, '');
-        return cleaned.slice(0, 6);
-    };
+    const formatPincode = (text: string) => text.replace(/\D/g, '').slice(0, 6);
 
     return (
-        <KeyboardAvoidingView
-            style={styles.keyboardView}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-            <View style={styles.container}>
-                {/* Header with Progress */}
+        <View style={styles.container}>
+            <LinearGradient
+                colors={[theme.colors.primary + '10', '#FFFFFF']}
+                style={StyleSheet.absoluteFill}
+            />
+
+            <KeyboardAvoidingView
+                style={styles.keyboardView}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+                {/* Fixed Header */}
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            style={styles.backButton}
-                        >
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                             <Ionicons name="arrow-back" size={24} color="#111827" />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Complete Profile</Text>
+                        <Text style={styles.headerTitle}>Account Setup</Text>
                         <View style={styles.placeholder} />
                     </View>
 
@@ -279,9 +284,7 @@ export default function SignupDetails() {
                         <View style={styles.progressBar}>
                             <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.colors.primary }]} />
                         </View>
-                        <Text style={styles.progressText}>
-                            {completedFields} of 5 fields completed
-                        </Text>
+                        <Text style={styles.progressText}>{completedFields} of 5 required fields</Text>
                     </View>
                 </View>
 
@@ -290,31 +293,27 @@ export default function SignupDetails() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <View style={styles.content}>
-                        {/* Logo Section */}
-                        <View style={styles.logoContainer}>
-                            <View style={styles.logoWrapper}>
-                                <Image
-                                    source={require('../../assets/images/devki-logo.png')}
-                                    style={styles.logo}
-                                    contentFit="contain"
-                                />
-                            </View>
-                        </View>
-
-                        {/* Welcome Section */}
+                    <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                        {/* Logo & Welcome */}
                         <View style={styles.welcomeSection}>
-                            <Text style={styles.welcomeTitle}>Let's get you set up!</Text>
-                            <Text style={styles.welcomeSubtitle}>
-                                We need a few details to personalize your experience
-                            </Text>
+                            <View style={styles.logoWrapper}>
+                                <View style={styles.logoContainer}>
+                                    <Image
+                                        source={require('../../assets/images/devki-logo.png')}
+                                        style={styles.logo}
+                                        contentFit="contain"
+                                    />
+                                </View>
+                            </View>
+                            <Text style={styles.welcomeTitle}>One last step!</Text>
+                            <Text style={styles.welcomeSubtitle}>Help us know you better for better care</Text>
                         </View>
 
-                        {/* Personal Info Card */}
+                        {/* Form Section */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
-                                <Ionicons name="person-circle-outline" size={24} color={theme.colors.primary} />
-                                <Text style={styles.cardTitle}>Personal Information</Text>
+                                <Ionicons name="person-outline" size={22} color={theme.colors.primary} />
+                                <Text style={styles.cardTitle}>Basic Details</Text>
                             </View>
 
                             <ModernInput
@@ -322,7 +321,7 @@ export default function SignupDetails() {
                                 label="First Name"
                                 value={firstName}
                                 onChangeText={setFirstName}
-                                placeholder="First Name"
+                                placeholder="e.g. Rahul"
                                 required
                                 autoCapitalize="words"
                                 returnKeyType="next"
@@ -335,7 +334,7 @@ export default function SignupDetails() {
                                 label="Last Name"
                                 value={lastName}
                                 onChangeText={setLastName}
-                                placeholder="Last Name (Optional)"
+                                placeholder="e.g. Sharma (Optional)"
                                 autoCapitalize="words"
                                 returnKeyType="next"
                                 onSubmitEditing={() => emailRef.current?.focus()}
@@ -347,27 +346,26 @@ export default function SignupDetails() {
                                 label="Email"
                                 value={email}
                                 onChangeText={setEmail}
-                                placeholder="Email (Optional)"
+                                placeholder="e.g. rahul@example.com (Optional)"
                                 keyboardType="email-address"
                                 returnKeyType="next"
                                 onSubmitEditing={() => addressRef.current?.focus()}
                             />
                         </View>
 
-                        {/* Address Info Card */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
-                                <Ionicons name="location-outline" size={24} color={theme.colors.primary} />
-                                <Text style={styles.cardTitle}>Delivery Address</Text>
+                                <Ionicons name="location-outline" size={22} color={theme.colors.primary} />
+                                <Text style={styles.cardTitle}>Address Details</Text>
                             </View>
 
                             <ModernInput
                                 inputRef={addressRef}
                                 icon="home-outline"
-                                label="Complete Address"
+                                label="Full Address"
                                 value={address}
                                 onChangeText={setAddress}
-                                placeholder="House/Flat No., Street, Area"
+                                placeholder="House No, Building, Street..."
                                 required
                                 multiline
                                 returnKeyType="next"
@@ -389,7 +387,6 @@ export default function SignupDetails() {
                                         onSubmitEditing={() => stateRef.current?.focus()}
                                     />
                                 </View>
-
                                 <View style={styles.halfWidth}>
                                     <ModernInput
                                         inputRef={stateRef}
@@ -421,16 +418,12 @@ export default function SignupDetails() {
                             />
                         </View>
 
-                        {/* Submit Button */}
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
                                 isFormValid() && !isLoading && [
                                     styles.submitButtonActive,
-                                    {
-                                        backgroundColor: theme.colors.primary,
-                                        shadowColor: theme.colors.primary,
-                                    }
+                                    { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }
                                 ],
                             ]}
                             onPress={handleSubmit}
@@ -441,89 +434,51 @@ export default function SignupDetails() {
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <>
-                                    <Text style={styles.submitButtonText}>Complete Setup</Text>
+                                    <Text style={styles.submitButtonText}>Create Account</Text>
                                     <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
                                 </>
                             )}
                         </TouchableOpacity>
 
                         <Text style={styles.helperText}>
-                            By continuing, you agree to our Terms of Service and Privacy Policy
+                            By creating an account, you agree to our terms and privacy policy.
                         </Text>
-                    </View>
+                    </Animated.View>
                 </ScrollView>
 
-                {/* Success Confirmation Modal */}
-                <Modal
-                    visible={showSuccess}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => { }}
-                >
+                {/* Success Modal */}
+                <Modal visible={showSuccess} transparent animationType="fade">
                     <View style={styles.modalOverlay}>
-                        <Animated.View
-                            style={[
-                                styles.successContainer,
-                                {
-                                    transform: [{ scale: scaleAnim }],
-                                },
-                            ]}
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.checkmarkCircle,
-                                    {
-                                        opacity: checkmarkAnim,
-                                        transform: [
-                                            {
-                                                scale: checkmarkAnim.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: [0.5, 1],
-                                                }),
-                                            },
-                                        ],
-                                    },
-                                ]}
-                            >
+                        <Animated.View style={[styles.successContainer, { transform: [{ scale: successScaleAnim }] }]}>
+                            <Animated.View style={[styles.checkmarkCircle, { opacity: checkmarkAnim }]}>
                                 <Ionicons name="checkmark" size={60} color="#FFFFFF" />
                             </Animated.View>
-
-                            <Text style={styles.successTitle}>Profile Created!</Text>
-                            <Text style={styles.successMessage}>
-                                Your profile has been successfully created. Welcome to Devki!
-                            </Text>
-
-                            <View style={styles.successLoader}>
-                                <ActivityIndicator size="small" color={theme.colors.primary} />
-                            </View>
+                            <Text style={styles.successTitle}>Welcome to Devki!</Text>
+                            <Text style={styles.successMessage}>Your profile is ready. Redirecting you...</Text>
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
                         </Animated.View>
                     </View>
                 </Modal>
-            </View>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+    },
     keyboardView: {
         flex: 1,
     },
-    container: {
-        flex: 1,
-        backgroundColor: '#F9FAFB',
-    },
     header: {
         backgroundColor: '#FFFFFF',
-        paddingTop: Platform.OS === 'ios' ? 50 : 20,
-        paddingBottom: 16,
-        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 60 : 30,
+        paddingBottom: 20,
+        paddingHorizontal: 24,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        borderBottomColor: '#F3F4F6',
     },
     headerTop: {
         flexDirection: 'row',
@@ -533,9 +488,10 @@ const styles = StyleSheet.create({
     },
     backButton: {
         padding: 4,
+        marginLeft: -4,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: '#111827',
     },
@@ -543,26 +499,26 @@ const styles = StyleSheet.create({
         width: 32,
     },
     progressContainer: {
-        marginTop: 8,
+        width: '100%',
     },
     progressBar: {
         height: 6,
-        backgroundColor: '#E5E7EB',
-        borderRadius: 3,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
         overflow: 'hidden',
         marginBottom: 8,
     },
     progressFill: {
         height: '100%',
-        borderRadius: 3,
+        borderRadius: 10,
     },
     progressText: {
         fontSize: 12,
         color: '#6B7280',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     scrollContent: {
-        padding: 20,
+        padding: 24,
         paddingBottom: 40,
     },
     content: {
@@ -572,43 +528,32 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 32,
     },
-    logoContainer: {
-        alignItems: 'center',
-        marginBottom: 24,
-    },
     logoWrapper: {
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 6,
+    },
+    logoContainer: {
         width: 80,
         height: 80,
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 4,
+        borderRadius: 22,
+        padding: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     logo: {
         width: '100%',
         height: '100%',
     },
-    avatarContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#F3F4F6',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 16,
-        borderWidth: 3,
-        borderColor: '#E9D5FF',
-    },
     welcomeTitle: {
-        fontSize: 24,
-        fontWeight: '700',
+        fontSize: 26,
+        fontWeight: '800',
         color: '#111827',
-        marginBottom: 8,
-        textAlign: 'center',
+        marginBottom: 6,
     },
     welcomeSubtitle: {
         fontSize: 15,
@@ -618,44 +563,43 @@ const styles = StyleSheet.create({
     },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 20,
+        borderRadius: 20,
+        padding: 24,
         marginBottom: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
     },
     cardTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#111827',
-        marginLeft: 12,
+        marginLeft: 10,
     },
-    inputContainer: {
+    fieldContainer: {
         marginBottom: 16,
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F9FAFB',
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#E5E7EB',
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: '#F3F4F6',
         paddingHorizontal: 16,
-        minHeight: 56,
+        minHeight: 60,
     },
     inputWrapperFocused: {
         backgroundColor: '#FFFFFF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
         elevation: 2,
     },
     iconContainer: {
@@ -666,11 +610,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     floatingLabel: {
-        marginBottom: 4,
+        marginBottom: 2,
     },
     floatingLabelText: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     required: {
         color: '#EF4444',
@@ -678,8 +622,8 @@ const styles = StyleSheet.create({
     modernInput: {
         fontSize: 16,
         color: '#111827',
-        paddingVertical: 0,
-        minHeight: 24,
+        fontWeight: '600',
+        paddingVertical: 4,
     },
     modernInputMultiline: {
         minHeight: 60,
@@ -687,7 +631,6 @@ const styles = StyleSheet.create({
     },
     row: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         gap: 12,
     },
     halfWidth: {
@@ -698,47 +641,47 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#D1D5DB',
-        borderRadius: 14,
-        paddingVertical: 16,
-        marginTop: 8,
+        borderRadius: 18,
+        height: 64,
+        marginTop: 12,
         marginBottom: 16,
-        gap: 8,
+        gap: 10,
     },
     submitButtonActive: {
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 6,
     },
     submitButtonText: {
         color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '800',
     },
     helperText: {
         fontSize: 12,
         color: '#9CA3AF',
         textAlign: 'center',
         lineHeight: 18,
+        paddingHorizontal: 20,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     successContainer: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 24,
+        borderRadius: 30,
         padding: 32,
         alignItems: 'center',
         width: '85%',
-        maxWidth: 400,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
     },
     checkmarkCircle: {
         width: 100,
@@ -751,10 +694,9 @@ const styles = StyleSheet.create({
     },
     successTitle: {
         fontSize: 24,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#111827',
         marginBottom: 12,
-        textAlign: 'center',
     },
     successMessage: {
         fontSize: 16,
@@ -762,8 +704,5 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 24,
         marginBottom: 24,
-    },
-    successLoader: {
-        marginTop: 8,
     },
 });

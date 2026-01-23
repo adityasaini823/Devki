@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Animated, Dimensions, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -84,8 +84,8 @@ export default function Welcome() {
                 </Animated.View>
 
                 <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
-                    <Text style={styles.title}>Devki</Text>
-                    <Text style={styles.subtitle}>Compassion & Care at Home</Text>
+                    <Text style={styles.title}>Devki Farm</Text>
+                    <Text style={styles.subtitle}>Your Trusted Source for Pure & Organic Products</Text>
                 </Animated.View>
             </View>
 
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
         height: 140,
         backgroundColor: '#FFFFFF',
         borderRadius: 40,
-        padding: 24,
+        padding: 6,
         marginBottom: 24,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        fontSize: 48,
+        fontSize: 44,
         fontWeight: '900',
         color: '#FFFFFF',
         letterSpacing: -1,
@@ -174,6 +174,3 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 });
-
-import { TouchableOpacity } from 'react-native';
-
