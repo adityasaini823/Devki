@@ -2,7 +2,7 @@
 
 # dependencies
 node_modules/
-
+.env
 # Expo
 .expo/
 dist/
@@ -41,3 +41,4 @@ app-example
 # generated native folders
 /ios
 /android
+.env

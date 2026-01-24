@@ -1,29 +1,74 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { TouchableOpacity } from 'react-native';
-import { useTheme } from '../_theme/ThemeProvider';
-import StoreHeader from '../components/headers/StoreHeader';
+import { TouchableOpacity, View } from "react-native";
+import { useTheme } from "../_theme/ThemeProvider";
+import StoreHeader from "../components/headers/StoreHeader";
+import HomeHeader from "../components/headers/HomeHeader";
+import OrdersHeader from "../components/headers/OrdersHeader";
 
 export default function RootLayout() {
   const { theme } = useTheme();
 
   return (
-    <Tabs screenOptions={{ tabBarShowLabel: false }}>
+    <Tabs
+      screenOptions={{
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.muted,
+        tabBarStyle: {
+          backgroundColor: theme.colors.card,
+          borderTopWidth: 0,
+          height: 64,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 8,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home-sharp' : 'home-outline'} color={color} size={24} />
+            <Ionicons
+              name={focused ? "home-sharp" : "home-outline"}
+              color={color}
+              size={24}
+            />
           ),
           headerShown: true,
-          headerTitle: 'Devki-Your Milky Way',
+          headerTitle: "Devki-Your Milky Way",
           headerStyle: { backgroundColor: theme.colors.primary },
-          headerTintColor: '#fff',
-          headerRight: () => (
-            <TouchableOpacity onPress={() => {alert('Profile pressed');}}>
-              <Ionicons name="person-circle" size={36} color="#fff" />
-            </TouchableOpacity>
+          headerTintColor: "#fff",
+          headerRight: () => <HomeHeader />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="subscription"
+        options={{
+          title: "Subscriptions",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "water-sharp" : "water-outline"}
+              color={color}
+              size={24}
+            />
           ),
+          headerShown: false, // Hide default header since we have custom header
+        }}
+      />
+      <Tabs.Screen
+        name="deliveries"
+        options={{
+          title: "My Deliveries",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "bicycle" : "bicycle-outline"}
+              color={color}
+              size={24}
+            />
+          ),
+          headerShown: false, // Use custom header in component
         }}
       />
       <Tabs.Screen
@@ -31,10 +76,57 @@ export default function RootLayout() {
         options={{
           header: () => <StoreHeader />,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'cart-sharp' : 'cart-outline'} color={color} size={24} />
+            <Ionicons
+              name={focused ? "storefront-sharp" : "storefront-outline"}
+              color={color}
+              size={24}
+            />
           ),
-            headerShown: true,
-          }}
+          headerShown: true,
+        }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          header: () => <OrdersHeader />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "receipt-sharp" : "receipt-outline"}
+              color={color}
+              size={24}
+            />
+          ),
+          headerShown: true,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarLabel: "Profile",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "person-sharp" : "person-outline"} color={color} size={24} />
+          ),
+          headerShown: true,
+        }}
+      />
+      <Tabs.Screen
+        name="cart"
+        options={{
+          title: "Cart",
+          href: null,
+          // tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
+          headerShown: false, // Use custom header in component
+        }}
+      />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          title: "Wallet",
+          href: null,
+          // tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
+          headerShown: false, // Use custom header in component
+        }}
       />
     </Tabs>
   );

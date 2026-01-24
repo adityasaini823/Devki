@@ -7,16 +7,30 @@ export type Theme = {
     card: string;
     text: string;
     muted: string;
+    // Additional colors for compatibility
+    border?: string;
+    accentSoft?: string;
+    textPrimary?: string;
+    textSecondary?: string;
+    textMuted?: string;
+    error?: string;
   };
 };
 
 const lightTheme: Theme = {
   colors: {
-    primary: '#035afc',    
-    background: '#f4f4f4',
-    card: '#ffffff',
-    text: '#000000',
-    muted: '#666666',
+    primary: '#FF5C00',    // Purple matching login/signup
+    background: '#F9FAFB', // Light gray background
+    card: '#FFFFFF',       // White cards
+    text: '#1F2937',       // Dark gray text
+    muted: '#6B7280',      // Medium gray for secondary text
+    // Additional colors
+    border: '#E5E7EB',     // Light border color
+    accentSoft: '#F3F4F6', // Soft accent background
+    textPrimary: '#1F2937', // Primary text (same as text)
+    textSecondary: '#6B7280', // Secondary text (same as muted)
+    textMuted: '#9CA3AF',  // Muted text
+    error: '#EF4444',      // Error/red color
   },
 };
 
