@@ -50,7 +50,7 @@ const formatDate = (dateString) => {
 
 const getStatusConfig = (statusInput) => {
     const status = typeof statusInput === 'string' ? statusInput : statusInput?.status;
-
+    // console.log(status);
     switch (status) {
         case 'delivered':
             return { name: 'checkmark-circle', color: '#10b981', bgColor: '#ecfdf5', label: 'Delivered' };
