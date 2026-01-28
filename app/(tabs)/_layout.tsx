@@ -1,27 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View, Platform } from "react-native";
 import { useTheme } from "../_theme/ThemeProvider";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import StoreHeader from "../components/headers/StoreHeader";
 import HomeHeader from "../components/headers/HomeHeader";
 import OrdersHeader from "../components/headers/OrdersHeader";
 
 export default function RootLayout() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
       screenOptions={{
         tabBarShowLabel: false,
+        tabBarHideOnKeyboard: true, // Useful on Android
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.muted,
         tabBarStyle: {
           backgroundColor: theme.colors.card,
           borderTopWidth: 0,
-          height: 72, // Increased height
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          height: Platform.OS === 'ios' ? 88 : 70 + (insets.bottom > 0 ? insets.bottom : 0),
+          paddingBottom: Platform.OS === 'ios' ? 30 : (insets.bottom > 0 ? insets.bottom : 12),
+          paddingTop: 12,
         },
         tabBarItemStyle: {
-          paddingVertical: 12, // Increased padding
+          height: 48,
         },
       }}
     >
