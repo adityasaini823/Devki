@@ -89,7 +89,6 @@ export default function Subscription() {
   const { data: productsData, isLoading: isLoadingProducts, refetch: refetchProducts } = useGetSubscriptionProductsQuery();
   const { data: subscriptionData, isLoading: isLoadingSubscription, refetch: refetchSubscription } = useGetSubscriptionQuery();
   const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useGetSubscriptionHistoryQuery();
-  const { data: deliveryHistoryData, isLoading: isLoadingDeliveryHistory, refetch: refetchDeliveryHistory } = useGetDeliveryHistoryQuery();
   const { data: settingsData, isLoading: isLoadingSettings, refetch: refetchSettings } = useGetSettingsQuery();
 
   const [createOrUpdateSubscription, { isLoading: isSaving }] = useCreateOrUpdateSubscriptionMutation();
@@ -100,7 +99,6 @@ export default function Subscription() {
       refetchSubscription();
       refetchSettings();
       refetchHistory();
-      refetchDeliveryHistory();
     }, [])
   );
 
@@ -108,7 +106,6 @@ export default function Subscription() {
   const [selectedTime, setSelectedTime] = useState(null);
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
-  const [historyTab, setHistoryTab] = useState('subscriptions'); // 'subscriptions' or 'deliveries'
 
   // Get products array
   const products = productsData?.products || [];
@@ -593,151 +590,75 @@ export default function Subscription() {
       >
         <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>History</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Subscription History</Text>
             <TouchableOpacity onPress={() => setIsHistoryVisible(false)} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={theme.colors.text} />
             </TouchableOpacity>
           </View>
 
-          {/* Tabs */}
-          <View style={[styles.tabContainer, { borderBottomColor: theme.colors.border }]}>
-            <TouchableOpacity
-              style={[styles.tabButton, historyTab === 'subscriptions' && styles.activeTab, { borderBottomColor: theme.colors.primary }]}
-              onPress={() => setHistoryTab('subscriptions')}
-            >
-              <Text style={[styles.tabText, { color: historyTab === 'subscriptions' ? theme.colors.primary : theme.colors.muted }]}>Subscriptions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabButton, historyTab === 'deliveries' && styles.activeTab, { borderBottomColor: theme.colors.primary }]}
-              onPress={() => setHistoryTab('deliveries')}
-            >
-              <Text style={[styles.tabText, { color: historyTab === 'deliveries' ? theme.colors.primary : theme.colors.muted }]}>Deliveries</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={{ height: 16 }} />
 
-          {historyTab === 'subscriptions' ? (
-            isLoadingHistory ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-              </View>
-            ) : (
-              <FlatList
-                data={historyData?.subscriptions || []}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="time-outline" size={48} color={theme.colors.muted} />
-                    <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No subscription history found</Text>
-                  </View>
-                }
-                renderItem={({ item }) => (
-                  <View style={[styles.historyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                    <View style={styles.historyHeader}>
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-                        <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                          {item.status ? item.status.toUpperCase() : 'UNKNOWN'}
-                        </Text>
-                      </View>
-                      <Text style={[styles.dateText, { color: theme.colors.muted }]}>
-                        {new Date(item.createdAt).toLocaleDateString()}
+          {isLoadingHistory ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              data={historyData?.subscriptions || []}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="time-outline" size={48} color={theme.colors.muted} />
+                  <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No subscription history found</Text>
+                </View>
+              }
+              renderItem={({ item }) => (
+                <View style={[styles.historyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                  <View style={styles.historyHeader}>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+                      <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                        {item.status ? item.status.toUpperCase() : 'UNKNOWN'}
                       </Text>
                     </View>
+                    <Text style={[styles.dateText, { color: theme.colors.muted }]}>
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
 
-                    <View style={styles.historyBody}>
-                      <View style={styles.productInfo}>
-                        <Text style={[styles.productName, { color: theme.colors.text }]}>
-                          {item.subscription_product?.name || 'Unknown Product'}
-                        </Text>
-                        <Text style={[styles.productDetails, { color: theme.colors.textSecondary }]}>
-                          {item.subscription_product?.quantity} • ₹{item.price_per_delivery}/day
-                        </Text>
-                      </View>
-                      <View style={styles.costInfo}>
-                        <Text style={[styles.totalCost, { color: theme.colors.primary }]}>
-                          ₹{item.monthly_estimate.toFixed(0)}/mo
-                        </Text>
-                      </View>
+                  <View style={styles.historyBody}>
+                    <View style={styles.productInfo}>
+                      <Text style={[styles.productName, { color: theme.colors.text }]}>
+                        {item.subscription_product?.name || 'Unknown Product'}
+                      </Text>
+                      <Text style={[styles.productDetails, { color: theme.colors.textSecondary }]}>
+                        {item.subscription_product?.quantity} • ₹{item.price_per_delivery}/day
+                      </Text>
                     </View>
-
-                    <View style={[styles.historyFooter, { borderTopColor: theme.colors.border }]}>
-                      <View style={styles.footerItem}>
-                        <Ionicons name="calendar-outline" size={14} color={theme.colors.muted} />
-                        <Text style={[styles.footerText, { color: theme.colors.muted }]}>
-                          {FREQUENCY_OPTIONS.find(f => f.value === item.frequency)?.label || item.frequency}
-                        </Text>
-                      </View>
-                      <View style={styles.footerItem}>
-                        <Ionicons name="time-outline" size={14} color={theme.colors.muted} />
-                        <Text style={[styles.footerText, { color: theme.colors.muted }]}>
-                          {item.delivery_time}
-                        </Text>
-                      </View>
+                    <View style={styles.costInfo}>
+                      <Text style={[styles.totalCost, { color: theme.colors.primary }]}>
+                        ₹{item.monthly_estimate.toFixed(0)}/mo
+                      </Text>
                     </View>
                   </View>
-                )}
-              />
-            )
-          ) : (
-            // Deliveries Tab
-            isLoadingDeliveryHistory ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-              </View>
-            ) : (
-              <FlatList
-                data={deliveryHistoryData?.deliveries || []}
-                keyExtractor={(item) => item._id}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="cube-outline" size={48} color={theme.colors.muted} />
-                    <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No delivery history found</Text>
-                  </View>
-                }
-                renderItem={({ item }) => {
-                  const isSkipped = item.status === 'skipped';
-                  const isMissed = item.status === 'missed';
-                  const statusColor = isSkipped ? '#F59E0B' : isMissed ? '#EF4444' : item.status === 'delivered' ? '#10B981' : '#6B7280';
 
-                  return (
-                    <View style={[styles.historyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                      <View style={styles.historyHeader}>
-                        <Text style={[styles.dateText, { fontWeight: '700', fontSize: 14, color: theme.colors.text }]}>
-                          {new Date(item.scheduled_date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </Text>
-                        <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                          <Text style={[styles.statusText, { color: statusColor }]}>
-                            {item.status.toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.historyBody}>
-                        <View style={styles.productInfo}>
-                          <Text style={[styles.productDetails, { color: theme.colors.text }]}>
-                            {item.product_quantity || '1L'} • {item.subscription_id?.delivery_time || 'Morning'}
-                          </Text>
-                          {item.notes ? (
-                            <Text style={[styles.dateText, { color: theme.colors.muted, marginTop: 4, fontStyle: 'italic' }]}>
-                              "{item.notes}"
-                            </Text>
-                          ) : null}
-                        </View>
-                        <View style={styles.costInfo}>
-                          <Text style={[styles.totalCost, { fontSize: 14, color: item.payment_status === 'deducted' ? theme.colors.error : theme.colors.muted }]}>
-                            {item.payment_status === 'deducted' ? `-₹${item.price}` : `₹${item.price}`}
-                          </Text>
-                          <Text style={[styles.dateText, { fontSize: 10, color: theme.colors.muted }]}>
-                            {item.payment_status === 'deducted' ? 'Paid' : 'No Charge'}
-                          </Text>
-                        </View>
-                      </View>
+                  <View style={[styles.historyFooter, { borderTopColor: theme.colors.border }]}>
+                    <View style={styles.footerItem}>
+                      <Ionicons name="calendar-outline" size={14} color={theme.colors.muted} />
+                      <Text style={[styles.footerText, { color: theme.colors.muted }]}>
+                        {FREQUENCY_OPTIONS.find(f => f.value === item.frequency)?.label || item.frequency}
+                      </Text>
                     </View>
-                  );
-                }}
-              />
-            )
+                    <View style={styles.footerItem}>
+                      <Ionicons name="time-outline" size={14} color={theme.colors.muted} />
+                      <Text style={[styles.footerText, { color: theme.colors.muted }]}>
+                        {item.delivery_time}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            />
           )}
         </View>
       </Modal>

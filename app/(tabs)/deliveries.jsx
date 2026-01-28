@@ -9,6 +9,8 @@ import {
     ActivityIndicator,
     RefreshControl,
     Alert,
+    Modal,
+    FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../_theme/ThemeProvider';
@@ -17,6 +19,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import {
     useGetMyDeliveriesQuery,
     useSkipDeliveryMutation,
+    useGetDeliveryHistoryQuery,
 } from '../../src/redux/api/deliveryApi';
 import { useGetSubscriptionQuery } from '../../src/redux/api/subscriptionApi';
 
@@ -53,8 +56,17 @@ const getStatusConfig = (status) => {
             return { name: 'close-circle', color: '#6b7280', bgColor: '#f3f4f6', label: 'Skipped' };
         case 'missed':
             return { name: 'alert-circle', color: '#ef4444', bgColor: '#fef2f2', label: 'Missed' };
-        case 'scheduled':
+        case 'scheduled': {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const scheduledDate = new Date(status.date || Date.now());
+            scheduledDate.setHours(0, 0, 0, 0);
+            
+            if (scheduledDate < now) {
+                return { name: 'time', color: '#F59E0B', bgColor: '#FEF3C7', label: 'Pending' };
+            }
             return { name: 'time', color: '#3b82f6', bgColor: '#eff6ff', label: 'Scheduled' };
+        }
         default:
             return { name: 'help-circle', color: '#6b7280', bgColor: '#f3f4f6', label: status };
     }
@@ -67,13 +79,17 @@ export default function Deliveries() {
 
     const { data: subscriptionData, refetch: refetchSubscription } = useGetSubscriptionQuery();
     const { data: deliveriesData, isLoading, isFetching, refetch: refetchDeliveries } = useGetMyDeliveriesQuery({});
+    const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useGetDeliveryHistoryQuery();
     const [skipDelivery, { isLoading: isSkipping }] = useSkipDeliveryMutation();
+
+    const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
     // Refetch data when screen comes into focus
     useFocusEffect(
         React.useCallback(() => {
             refetchSubscription();
             refetchDeliveries();
+            refetchHistory();
         }, [])
     );
 
@@ -90,15 +106,21 @@ export default function Deliveries() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const upcomingDeliveries = deliveries.filter((d) => {
-        const dDate = new Date(d.scheduled_date);
-        dDate.setHours(0, 0, 0, 0);
-        return dDate >= today && d.status === 'scheduled';
-    });
+    const upcomingDeliveries = deliveries
+        .filter((d) => {
+            const dDate = new Date(d.scheduled_date);
+            dDate.setHours(0, 0, 0, 0);
+            return dDate >= today && d.status === 'scheduled';
+        })
+        .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date)); // Closest first
 
-    const pastDeliveries = deliveries.filter((d) => {
-        return d.status !== 'scheduled';
-    });
+    const pastDeliveries = deliveries
+        .filter((d) => {
+            const dDate = new Date(d.scheduled_date);
+            dDate.setHours(0, 0, 0, 0);
+            return d.status !== 'scheduled' || dDate < today;
+        })
+        .sort((a, b) => new Date(b.scheduled_date) - new Date(a.scheduled_date)); // Newest first (reverse chronological)
 
     const handleSkip = (delivery) => {
         Alert.alert(
@@ -131,7 +153,10 @@ export default function Deliveries() {
     };
 
     const renderDeliveryItem = (delivery, isUpcoming) => {
-        const statusConfig = getStatusConfig(delivery.status);
+        const statusConfig = getStatusConfig({
+            status: delivery.status,
+            date: delivery.scheduled_date
+        });
         
         const dDate = new Date(delivery.scheduled_date);
         dDate.setHours(0, 0, 0, 0);
@@ -242,7 +267,9 @@ export default function Deliveries() {
                     <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Deliveries</Text>
-                <View style={styles.headerSpacer} />
+                <TouchableOpacity onPress={() => setIsHistoryVisible(true)} style={styles.headerIconStyle}>
+                    <Ionicons name="time-outline" size={24} color="#fff" />
+                </TouchableOpacity>
             </View>
 
             {isLoading ? (
@@ -333,10 +360,100 @@ export default function Deliveries() {
                                 </Text>
                             </View>
                             {pastDeliveries.slice(0, 10).map((d) => renderDeliveryItem(d, false))}
+                            
+                            {pastDeliveries.length > 10 && (
+                                <TouchableOpacity 
+                                    style={[styles.viewAllButton, { borderColor: theme.colors.primary }]}
+                                    onPress={() => setIsHistoryVisible(true)}
+                                >
+                                    <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All History</Text>
+                                    <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+                                </TouchableOpacity>
+                            )}
                         </View>
                     )}
                 </ScrollView>
             )}
+
+            {/* History Modal */}
+            <Modal
+                visible={isHistoryVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setIsHistoryVisible(false)}
+            >
+                <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Delivery History</Text>
+                        <TouchableOpacity onPress={() => setIsHistoryVisible(false)} style={styles.closeButton}>
+                            <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {isLoadingHistory ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={theme.colors.primary} />
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={historyData?.deliveries || []}
+                            keyExtractor={(item) => item._id}
+                            contentContainerStyle={styles.listContent}
+                            ListEmptyComponent={
+                                <View style={styles.emptyContainer}>
+                                    <Ionicons name="cube-outline" size={48} color={theme.colors.muted} />
+                                    <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No delivery history found</Text>
+                                </View>
+                            }
+                            renderItem={({ item }) => {
+                                const isSkipped = item.status === 'skipped';
+                                const isMissed = item.status === 'missed';
+                                const statusConfig = getStatusConfig({
+                                    status: item.status,
+                                    date: item.scheduled_date
+                                });
+                                const statusColor = statusConfig.color;
+
+                                return (
+                                    <View style={[styles.historyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                                        <View style={styles.historyCardHeader}>
+                                            <Text style={[styles.dateTextLabel, { fontWeight: '700', fontSize: 14, color: theme.colors.textPrimary }]}>
+                                                {new Date(item.scheduled_date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                                            </Text>
+                                            <View style={[styles.statusBadgeHistory, { backgroundColor: statusConfig.bgColor }]}>
+                                                <Text style={[styles.statusTextHistory, { color: statusColor }]}>
+                                                    {statusConfig.label.toUpperCase()}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.historyCardBody}>
+                                            <View style={styles.productInfo}>
+                                                <Text style={[styles.productDetails, { color: theme.colors.textPrimary }]}>
+                                                    {item.product_quantity || '1L'} • {item.subscription_id?.delivery_time || 'Morning'}
+                                                </Text>
+                                                {item.notes ? (
+                                                    <Text style={[styles.notesText, { color: theme.colors.muted, marginTop: 4, fontStyle: 'italic' }]}>
+                                                        "{item.notes}"
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                            <View style={styles.costInfo}>
+                                                <Text style={[styles.totalCost, { fontSize: 14, fontWeight: '700', color: item.payment_status === 'deducted' ? theme.colors.error : theme.colors.muted }]}>
+                                                    {item.payment_status === 'deducted' ? `-₹${item.price}` : `₹${item.price}`}
+                                                </Text>
+                                                <Text style={[styles.paymentStatusText, { fontSize: 10, color: theme.colors.muted, textAlign: 'right' }]}>
+                                                    {item.payment_status === 'deducted' ? 'Paid' : 'No Charge'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                );
+                            }}
+                        />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -587,6 +704,90 @@ const styles = StyleSheet.create({
     skipButtonLabel: {
         fontSize: 13,
         fontWeight: '700',
+    },
+    headerIconStyle: {
+        padding: 8,
+        marginRight: -8,
+    },
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        marginTop: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        gap: 8,
+    },
+    viewAllText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    modalContainer: {
+        flex: 1,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    listContent: {
+        padding: 16,
+    },
+    historyCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        padding: 16,
+        marginBottom: 12,
+    },
+    historyCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    dateTextLabel: {
+        fontSize: 14,
+    },
+    statusBadgeHistory: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    statusTextHistory: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    historyCardBody: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    productInfo: {
+        flex: 1,
+    },
+    notesText: {
+        fontSize: 12,
+    },
+    costInfo: {
+        alignItems: 'flex-end',
+    },
+    totalCost: {
+        fontSize: 14,
+    },
+    paymentStatusText: {
+        fontSize: 10,
     },
 });
 
