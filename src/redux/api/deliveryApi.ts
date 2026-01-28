@@ -19,6 +19,15 @@ export const deliveryApi = baseApi.injectEndpoints({
             providesTags: ['Deliveries'],
         }),
 
+        // Get user's delivery history
+        getDeliveryHistory: builder.query<any, void>({
+            query: () => ({
+                url: '/deliveries/my-delivery-history',
+                method: 'GET',
+            }),
+            providesTags: ['Deliveries'],
+        }),
+
         // Skip a delivery (user)
         skipDelivery: builder.mutation({
             query: ({ id, notes }) => ({
@@ -34,4 +43,5 @@ export const deliveryApi = baseApi.injectEndpoints({
 export const {
     useGetMyDeliveriesQuery,
     useSkipDeliveryMutation,
+    useGetDeliveryHistoryQuery,
 } = deliveryApi;
