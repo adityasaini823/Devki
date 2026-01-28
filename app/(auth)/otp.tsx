@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, ActivityIndicator, Alert, Modal, Animated, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -32,6 +32,8 @@ export default function Otp() {
     const [otp, setOtp] = useState(['', '', '', '']);
     const inputRefs = useRef<(TextInput | null)[]>([]);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [timer, setTimer] = useState(60);
+    const [canResend, setCanResend] = useState(false);
 
     const [verifyOTP, { isLoading: isVerifying }] = useVerifyOTPMutation();
     const [sendLoginOTP, { isLoading: isResending }] = useSendLoginOTPMutation();
@@ -84,6 +86,18 @@ export default function Otp() {
             inputRefs.current[index - 1]?.focus();
         }
     };
+
+    useEffect(() => {
+        let interval: any;
+        if (timer > 0) {
+            interval = setInterval(() => {
+                setTimer((prev) => prev - 1);
+            }, 1000);
+        } else {
+            setCanResend(true);
+        }
+        return () => clearInterval(interval);
+    }, [timer]);
 
     const handleVerify = async () => {
         const otpCode = otp.join('');
@@ -164,6 +178,8 @@ export default function Otp() {
                 text2: 'OTP has been resent to ' + phoneNumber,
             });
             setOtp(['', '', '', '']);
+            setTimer(60);
+            setCanResend(false);
         } catch (error: any) {
             Toast.show({
                 type: 'error',
@@ -240,16 +256,24 @@ export default function Otp() {
                     </TouchableOpacity>
 
                     <View style={styles.resendContainer}>
-                        <Text style={styles.resendText}>Didn't receive code? </Text>
-                        <TouchableOpacity onPress={handleResend} disabled={isResending}>
-                            {isResending ? (
-                                <ActivityIndicator size="small" color={theme.colors.primary} />
-                            ) : (
-                                <Text style={[styles.resendLink, { color: theme.colors.primary }]}>
-                                    Resend
-                                </Text>
-                            )}
-                        </TouchableOpacity>
+                        {canResend ? (
+                            <>
+                                <Text style={styles.resendText}>Didn't receive code? </Text>
+                                <TouchableOpacity onPress={handleResend} disabled={isResending}>
+                                    {isResending ? (
+                                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                                    ) : (
+                                        <Text style={[styles.resendLink, { color: theme.colors.primary }]}>
+                                            Resend
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </>
+                        ) : (
+                            <Text style={styles.resendText}>
+                                Resend code in <Text style={{ fontWeight: '700', color: theme.colors.primary }}>{timer}s</Text>
+                            </Text>
+                        )}
                     </View>
                 </View>
 
