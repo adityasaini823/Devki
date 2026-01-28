@@ -29,6 +29,7 @@ import {
 import { useGetProfileQuery } from '../../src/redux/api/authApi';
 import { useGetSettingsQuery } from '../../src/redux/api/settingsApi';
 import { uploadImage } from '../../src/api/adminApi';
+import { toastConfig } from '../../src/config/toastConfig';
 
 export default function WalletScreen() {
     const { theme } = useTheme();
@@ -440,7 +441,7 @@ export default function WalletScreen() {
                             <View style={{ height: 20 }} />
                         </ScrollView>
                     </View>
-                    <Toast ref={addMoneyToastRef} />
+                    <Toast ref={addMoneyToastRef} config={toastConfig} />
                 </KeyboardAvoidingView>
             </Modal>
 
@@ -520,7 +521,7 @@ export default function WalletScreen() {
                             </TouchableOpacity>
                         </View>
                     </ScrollView>
-                    <Toast ref={withdrawToastRef} />
+                    <Toast ref={withdrawToastRef} config={toastConfig} />
                 </KeyboardAvoidingView>
             </Modal>
         </View>

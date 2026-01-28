@@ -3,6 +3,7 @@ import Toast from 'react-native-toast-message';
 import { Provider } from 'react-redux';
 import { store } from '../src/redux/store';
 import ThemeProvider from './_theme/ThemeProvider';
+import { toastConfig } from '../src/config/toastConfig';
 
 export default function RootLayout() {
   return (
@@ -13,7 +14,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
-        <Toast />
+        <Toast config={toastConfig} />
       </ThemeProvider>
     </Provider>
   );
