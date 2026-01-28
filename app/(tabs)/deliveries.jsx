@@ -48,7 +48,9 @@ const formatDate = (dateString) => {
     });
 };
 
-const getStatusConfig = (status) => {
+const getStatusConfig = (statusInput) => {
+    const status = typeof statusInput === 'string' ? statusInput : statusInput?.status;
+
     switch (status) {
         case 'delivered':
             return { name: 'checkmark-circle', color: '#10b981', bgColor: '#ecfdf5', label: 'Delivered' };
@@ -59,11 +61,11 @@ const getStatusConfig = (status) => {
         case 'scheduled': {
             const now = new Date();
             now.setHours(0, 0, 0, 0);
-            const scheduledDate = new Date(status.date || Date.now());
+            const scheduledDate = new Date(statusInput?.date || Date.now());
             scheduledDate.setHours(0, 0, 0, 0);
             
             if (scheduledDate < now) {
-                return { name: 'time', color: '#F59E0B', bgColor: '#FEF3C7', label: 'Pending' };
+                return { name: 'time', color: '#F59E0B', bgColor: '#FEF3C7', label: 'Missed' };
             }
             return { name: 'time', color: '#3b82f6', bgColor: '#eff6ff', label: 'Scheduled' };
         }
