@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Pressable,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { tokenStorage } from "../../src/utils/tokenStorage";
@@ -17,6 +18,7 @@ import { useTheme } from "../_theme/ThemeProvider";
 import { useGetProductsQuery } from "../../src/redux/api/productApi";
 import { useGetSubscriptionQuery } from "../../src/redux/api/subscriptionApi";
 import { useAddOrUpdateCartItemMutation } from "../../src/redux/api/cartApi";
+import { useGetWalletBalanceQuery } from "../../src/redux/api/walletApi";
 
 export default function HomeScreen() {
   const { theme } = useTheme();
@@ -28,16 +30,19 @@ export default function HomeScreen() {
   // Fetch data
   const { data: productsData, isLoading: isLoadingProducts, refetch: refetchProducts } = useGetProductsQuery();
   const { data: subscriptionData, isLoading: isLoadingSubscription, refetch: refetchSubscription } = useGetSubscriptionQuery();
+  const { data: balanceData, refetch: refetchWallet } = useGetWalletBalanceQuery();
   const [addOrUpdateCartItem] = useAddOrUpdateCartItemMutation();
 
   const products = productsData?.products || [];
   const featuredProducts = products.slice(0, 4); // Show first 4 products
   const subscription = subscriptionData?.subscription;
+  const balance = balanceData?.balance || 0;
 
   useFocusEffect(
     useCallback(() => {
       refetchProducts();
       refetchSubscription();
+      refetchWallet();
     }, [])
   );
 
@@ -51,9 +56,10 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchProducts(), refetchSubscription()]);
+    await Promise.all([refetchProducts(), refetchSubscription(), refetchWallet()]);
     setRefreshing(false);
   };
+  // ... (keep existing handler functions)
 
   const handleAddToCart = async (productId: string, productName: string) => {
     setAddingProductId(productId);
@@ -86,20 +92,46 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={{ paddingBottom: 100 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
     >
       {/* Hero Section */}
       <View style={styles.heroContainer}>
-        <Image
-          source={{
-            uri: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800",
-          }}
-          style={styles.heroImage}
-        />
-        <View style={styles.heroOverlay}>
-          <Text style={styles.heroTitle}>Welcome {user?.first_name || "Back"}!</Text>
-          <Text style={styles.heroSubtitle}>Your fresh milk delivery partner</Text>
-        </View>
+        <LinearGradient
+          colors={[theme.colors.primary, lightenColor(theme.colors.primary, 0.8)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroGradient}
+        >
+          <View style={styles.heroContent}>
+            <View style={styles.heroTextContainer}>
+              <Text style={styles.heroGreeting}>Hello, {user?.first_name || "Milk Mate"}!</Text>
+
+              <View style={{ marginVertical: 12 }}>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600' }}>Wallet Balance</Text>
+                <Text style={{ fontSize: 32, color: '#fff', fontWeight: '800' }}>₹{balance.toFixed(2)}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.heroCTA}
+                onPress={() => router.push("/(tabs)/wallet")}
+              >
+                <Text style={[styles.heroCTAText, { color: theme.colors.primary }]}>Top Up</Text>
+                <Ionicons name="wallet" size={16} color={theme.colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.heroIconContainer}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="water" size={60} color="rgba(255,255,255,0.3)" />
+              </View>
+            </View>
+          </View>
+
+          {/* Abstract Shapes for Texture */}
+          <View style={[styles.abstractShape, styles.shape1]} />
+          <View style={[styles.abstractShape, styles.shape2]} />
+        </LinearGradient>
       </View>
 
       {/* Quick Navigation Cards */}
@@ -110,10 +142,9 @@ export default function HomeScreen() {
           activeOpacity={0.7}
         >
           <View style={[styles.quickNavIconContainer, { backgroundColor: lightenColor(theme.colors.primary, 0.2) }]}>
-            <Ionicons name="water" size={24} color={theme.colors.primary} />
+            <Ionicons name="calendar" size={24} color={theme.colors.primary} />
           </View>
-          <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Subscriptions</Text>
-          <Text style={[styles.quickNavSubtitle, { color: theme.colors.muted }]}>Manage your plan</Text>
+          <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Subscribe</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -125,7 +156,6 @@ export default function HomeScreen() {
             <Ionicons name="storefront" size={24} color={theme.colors.primary} />
           </View>
           <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Store</Text>
-          <Text style={[styles.quickNavSubtitle, { color: theme.colors.muted }]}>Browse products</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -137,7 +167,17 @@ export default function HomeScreen() {
             <Ionicons name="receipt" size={24} color={theme.colors.primary} />
           </View>
           <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Orders</Text>
-          <Text style={[styles.quickNavSubtitle, { color: theme.colors.muted }]}>Track orders</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.quickNavCard, { backgroundColor: theme.colors.card }]}
+          onPress={() => alert('Support feature coming soon!')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.quickNavIconContainer, { backgroundColor: lightenColor(theme.colors.primary, 0.2) }]}>
+            <Ionicons name="headset" size={24} color={theme.colors.primary} />
+          </View>
+          <Text style={[styles.quickNavTitle, { color: theme.colors.text }]}>Support</Text>
         </TouchableOpacity>
       </View>
 
@@ -296,52 +336,105 @@ const lightenColor = (color: string, opacity = 0.1) => {
 };
 
 const styles = StyleSheet.create({
-    container: {
+  container: {
     flex: 1,
   },
   heroContainer: {
-    position: "relative",
-    height: 200,
-    marginBottom: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 24,
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
   },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  heroGradient: {
+    padding: 24,
+    minHeight: 180,
   },
-  heroOverlay: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
+  heroContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  heroTextContainer: {
+    flex: 1,
+  },
+  heroGreeting: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.8)",
+    fontWeight: "600",
   },
   heroTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "800",
     color: "#fff",
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    marginBottom: 8,
   },
   heroSubtitle: {
     fontSize: 14,
-    color: "#fff",
-    marginTop: 4,
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    color: "rgba(255,255,255,0.9)",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  heroCTA: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+  },
+  heroCTAText: {
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  heroIconContainer: {
+    marginLeft: 16,
+  },
+  iconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  abstractShape: {
+    position: "absolute",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 100,
+  },
+  shape1: {
+    width: 200,
+    height: 200,
+    top: -100,
+    right: -100,
+  },
+  shape2: {
+    width: 150,
+    height: 150,
+    bottom: -75,
+    left: -75,
   },
   quickNavContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 16,
     marginBottom: 24,
-    gap: 12,
+    gap: 8, // Reduced gap
   },
   quickNavCard: {
     flex: 1,
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 12, // Reduced vertical padding
+    paddingHorizontal: 4, // Minimal horizontal padding
     alignItems: "center",
     shadowColor: "#000",
     shadowOpacity: 0.08,
@@ -349,22 +442,21 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   quickNavIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44, // Slightly smaller
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
   },
   quickNavTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
+    fontSize: 11, // Reduced font size to prevent wrapping
+    fontWeight: "700",
+    marginBottom: 0,
     textAlign: "center",
   },
   quickNavSubtitle: {
-    fontSize: 11,
-    textAlign: "center",
+    display: 'none', // Hide subtitles to save space and clean up UI as per design
   },
   section: {
     marginBottom: 24,

@@ -1,860 +1,796 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import Toast from 'react-native-toast-message';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  Alert,
-  Modal,
-  RefreshControl,
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    TextInput,
+    ActivityIndicator,
+    Modal,
+    RefreshControl,
+    Platform,
+    KeyboardAvoidingView,
+    Pressable,
+    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../_theme/ThemeProvider';
 import WalletHeader from '../components/headers/WalletHeader';
 import {
-  useGetWalletBalanceQuery,
-  useGetWalletTransactionsQuery,
-  useAddMoneyToWalletMutation,
-  useRequestWithdrawalMutation,
+    useGetWalletBalanceQuery,
+    useGetWalletTransactionsQuery,
+    useAddMoneyToWalletMutation,
+    useRequestWithdrawalMutation,
 } from '../../src/redux/api/walletApi';
 import { useGetProfileQuery } from '../../src/redux/api/authApi';
 import { useGetSettingsQuery } from '../../src/redux/api/settingsApi';
-import ImageUpload from '../../src/components/common/ImageUpload';
+import { uploadImage } from '../../src/api/adminApi';
+import { toastConfig } from '../../src/config/toastConfig';
 
-export default function Wallet() {
-  const { theme } = useTheme();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'overview' | 'add-money' | 'withdraw'>('overview');
-  const [addMoneyAmount, setAddMoneyAmount] = useState('');
-  const [addMoneyRemarks, setAddMoneyRemarks] = useState('');
-  const [paymentProofUrl, setPaymentProofUrl] = useState('');
-  const [transactionId, setTransactionId] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [bankDetails, setBankDetails] = useState({
-    account_number: '',
-    ifsc_code: '',
-    account_holder_name: '',
-  });
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+export default function WalletScreen() {
+    const { theme } = useTheme();
+    const router = useRouter();
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
+    // Toast Refs
+    const addMoneyToastRef = useRef<any>(null);
+    const withdrawToastRef = useRef<any>(null);
 
-  const { data: balanceData, isLoading: isLoadingBalance, refetch: refetchBalance } = useGetWalletBalanceQuery(
-    undefined,
-    { pollingInterval: 30000 } // Poll every 30 seconds for balance updates
-  );
-  const {
-    data: transactionsData,
-    isLoading: isLoadingTransactions,
-    refetch: refetchTransactions,
-    isFetching: isFetchingTransactions,
-  } = useGetWalletTransactionsQuery(
-    { page: 1, limit: 20 },
-    { pollingInterval: 30000 } // Poll every 30 seconds for transaction updates
-  );
+    // API Queries
+    const { data: balanceData, isLoading: isLoadingBalance, refetch: refetchBalance } = useGetWalletBalanceQuery(
+        undefined,
+        { pollingInterval: 30000 }
+    );
+    const {
+        data: transactionsData,
+        isLoading: isLoadingTransactions,
+        isFetching: isFetchingTransactions,
+        refetch: refetchTransactions
+    } = useGetWalletTransactionsQuery(
+        { page: 1, limit: 20 },
+        { pollingInterval: 30000 }
+    );
+    const { data: settingsData, isLoading: isLoadingSettings } = useGetSettingsQuery();
+    const { data: profileData } = useGetProfileQuery();
 
-  const { data: settingsData, isLoading: isLoadingSettings } = useGetSettingsQuery();
-  const upiId = settingsData?.settings?.payment?.upi_id || 'adityasaini2468@okicici'; // Fallback
+    // API Mutations
+    const [addMoney, { isLoading: isAddingMoney }] = useAddMoneyToWalletMutation();
+    const [requestWithdrawal, { isLoading: isWithdrawing }] = useRequestWithdrawalMutation();
 
-  const { data: profileData } = useGetProfileQuery();
-  const userId = profileData?.user?.id || 'unknown';
-  const paymentFolder = `devki/payments/user_${userId}`;
+    // UI State
+    const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+    const [isWithdrawModalVisible, setIsWithdrawModalVisible] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
-  const [addMoney, { isLoading: isAddingMoney }] = useAddMoneyToWalletMutation();
-  const [requestWithdrawal, { isLoading: isRequestingWithdrawal }] = useRequestWithdrawalMutation();
+    // Form State
+    const [addMoneyAmount, setAddMoneyAmount] = useState('');
+    const [addMoneyRemarks, setAddMoneyRemarks] = useState('');
+    const [paymentProofUrl, setPaymentProofUrl] = useState('');
 
-  useFocusEffect(
-    useCallback(() => {
-      refetchBalance();
-      refetchTransactions();
-    }, [])
-  );
+    const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [bankDetails, setBankDetails] = useState({
+        account_number: '',
+        ifsc_code: '',
+        account_holder_name: '',
+    });
 
-  // Pull to refresh handler
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await Promise.all([refetchBalance(), refetchTransactions()]);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refetchBalance, refetchTransactions]);
+    const balance = balanceData?.balance || 0;
+    const transactions = transactionsData?.transactions || [];
+    const upiId = settingsData?.settings?.payment?.upi_id || 'adityasaini2468@okicici';
+    const userId = profileData?.user?.id || 'unknown';
+    const paymentFolder = `devki/payments/user_${userId}`;
 
-  const balance = balanceData?.balance || 0;
-  const transactions = transactionsData?.transactions || [];
+    useFocusEffect(
+        useCallback(() => {
+            refetchBalance();
+            refetchTransactions();
+        }, [])
+    );
 
-  const handleAmountChange = (text: string, setter: (value: string) => void) => {
-    // allow only numbers and one decimal point
-    let cleaned = text.replace(/[^0-9.]/g, '');
-    
-    // prevent multiple decimal points
-    const parts = cleaned.split('.');
-    if (parts.length > 2) {
-      cleaned = parts[0] + '.' + parts.slice(1).join('');
-    }
-    
-    setter(cleaned);
-  };
-
-  const handleAddMoney = async () => {
-    const amount = parseFloat(addMoneyAmount);
-    if (!amount || amount < 10) {
-      Toast.show({
-        type: 'error',
-        text1: 'Invalid Amount',
-        text2: 'Minimum deposit amount is ₹10',
-      });
-      return;
-    }
-
-    if (!paymentProofUrl) {
-      Toast.show({
-        type: 'error',
-        text1: 'Payment Proof Required',
-        text2: 'Please upload a screenshot of your payment',
-      });
-      return;
-    }
-
-    if (!transactionId) {
-      Toast.show({
-        type: 'error',
-        text1: 'Transaction ID Required',
-        text2: 'Please enter the UPI Transaction ID',
-      });
-      return;
-    }
-
-    try {
-      await addMoney({
-        amount,
-        payment_method: 'upi',
-        payment_id: transactionId,
-        payment_proof: paymentProofUrl,
-        remarks: addMoneyRemarks || undefined
-      }).unwrap();
-      Toast.show({
-        type: 'success',
-        text1: 'Request Submitted',
-        text2: `Request to add ₹${amount} submitted successfully!`,
-      });
-      setAddMoneyAmount('');
-      setAddMoneyRemarks('');
-      setPaymentProofUrl('');
-      setTransactionId('');
-      setActiveTab('overview');
-      // Refetch both balance and transactions
-      refetchBalance();
-      refetchTransactions();
-    } catch (error: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error?.data?.message || 'Failed to submit request. Please try again.',
-      });
-    }
-  };
-
-  const handleWithdraw = async () => {
-    const amount = parseFloat(withdrawAmount);
-    if (!amount || amount < 100) {
-      Alert.alert('Invalid Amount', 'Minimum withdrawal amount is ₹100');
-      return;
-    }
-
-    if (!bankDetails.account_number || !bankDetails.ifsc_code || !bankDetails.account_holder_name) {
-      Alert.alert('Missing Details', 'Please fill all bank account details');
-      return;
-    }
-
-    if (amount > balance) {
-      Alert.alert('Insufficient Balance', `Your wallet balance is ₹${balance}`);
-      return;
-    }
-
-    try {
-      await requestWithdrawal({ amount, bank_account: bankDetails }).unwrap();
-      Alert.alert(
-        'Success',
-        'Withdrawal request submitted successfully. It will be processed within 2-3 business days.'
-      );
-      setWithdrawAmount('');
-      setBankDetails({ account_number: '', ifsc_code: '', account_holder_name: '' });
-      setShowWithdrawModal(false);
-      setActiveTab('overview');
-      // Refetch both balance and transactions
-      refetchBalance();
-      refetchTransactions();
-    } catch (error: any) {
-      Alert.alert('Error', error?.data?.message || 'Failed to request withdrawal. Please try again.');
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#10B981';
-      case 'pending':
-        return '#F59E0B';
-      case 'rejected':
-      case 'cancelled':
-        return '#EF4444';
-      default:
-        return theme.colors.muted;
-    }
-  };
-
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Custom Header */}
-      <WalletHeader />
-
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
-          />
+    const onRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        try {
+            await Promise.all([refetchBalance(), refetchTransactions()]);
+        } finally {
+            setIsRefreshing(false);
         }
-      >
-        {/* Balance Card */}
-        <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.balanceLabel}>Wallet Balance</Text>
-          {isLoadingBalance ? (
-            <ActivityIndicator size="small" color="#fff" style={{ marginTop: 8 }} />
-          ) : (
-            <Text style={styles.balanceAmount}>₹{balance.toFixed(2)}</Text>
-          )}
-        </View>
+    }, [refetchBalance, refetchTransactions]);
 
-        {/* Tab Buttons */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-            onPress={() => setActiveTab('overview')}
-          >
-            <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>Overview</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'add-money' && styles.activeTab]}
-            onPress={() => setActiveTab('add-money')}
-          >
-            <Text style={[styles.tabText, activeTab === 'add-money' && styles.activeTabText]}>Add Money</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'withdraw' && styles.activeTab]}
-            onPress={() => setActiveTab('withdraw')}
-          >
-            <Text style={[styles.tabText, activeTab === 'withdraw' && styles.activeTabText]}>Withdraw</Text>
-          </TouchableOpacity>
-        </View>
+    const pickImage = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 1,
+        });
 
-        {/* Tab Content */}
-        {activeTab === 'overview' && (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
-              {isFetchingTransactions && !isLoadingTransactions && (
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-              )}
-            </View>
-            {isLoadingTransactions ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginTop: 20 }} />
-            ) : transactions.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="receipt-outline" size={48} color={theme.colors.muted} />
-                <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No transactions yet</Text>
-              </View>
-            ) : (
-              <View style={styles.transactionsList}>
-                {transactions.map((transaction) => (
-                  <View key={transaction._id} style={[styles.transactionItem, { backgroundColor: theme.colors.card }]}>
-                    <View style={styles.transactionLeft}>
-                      <View
-                        style={[
-                          styles.transactionIcon,
-                          {
-                            backgroundColor:
-                              transaction.transaction_type === 'deposit'
-                                ? 'rgba(16, 185, 129, 0.1)'
-                                : 'rgba(239, 68, 68, 0.1)',
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name={transaction.transaction_type === 'deposit' ? 'arrow-down' : 'arrow-up'}
-                          size={20}
-                          color={transaction.transaction_type === 'deposit' ? '#10B981' : '#EF4444'}
-                        />
-                      </View>
-                      <View style={styles.transactionDetails}>
-                        <Text style={[styles.transactionType, { color: theme.colors.text }]}>
-                          {transaction.transaction_type === 'deposit'
-                            ? (transaction.status === 'completed' ? 'Money Added' : 'Deposit Request')
-                            : 'Withdrawal Request'}
-                        </Text>
-                        <Text style={[styles.transactionDate, { color: theme.colors.muted }]}>
-                          {formatDate(transaction.createdAt)}
-                        </Text>
-                      </View>
+        if (!result.canceled) {
+            handleUpload(result.assets[0]);
+        }
+    };
+
+    const handleUpload = async (asset: ImagePicker.ImagePickerAsset) => {
+        setIsUploading(true);
+        try {
+            const formData = new FormData();
+            if (Platform.OS === 'web') {
+                const response = await fetch(asset.uri);
+                const blob = await response.blob();
+                formData.append('image', blob, 'upload.jpg');
+            } else {
+                const localUri = asset.uri;
+                const filename = localUri.split('/').pop() || 'upload.jpg';
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : `image`;
+                // @ts-ignore
+                formData.append('image', { uri: localUri, name: filename, type });
+            }
+
+            const response = await uploadImage(formData, paymentFolder);
+            if (response && response.success) {
+                setPaymentProofUrl(response.data.url);
+                addMoneyToastRef.current?.show({ type: 'success', text1: 'Image Uploaded' });
+            } else {
+                addMoneyToastRef.current?.show({ type: 'error', text1: 'Upload Failed', text2: response?.message });
+            }
+        } catch (err: any) {
+            addMoneyToastRef.current?.show({ type: 'error', text1: 'Upload Failed', text2: err.message });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleAddMoney = async () => {
+        const amount = parseFloat(addMoneyAmount);
+        if (!amount || amount < 10) {
+            addMoneyToastRef.current?.show({ type: 'error', text1: 'Invalid Amount', text2: 'Minimum deposit amount is ₹10' });
+            return;
+        }
+
+        if (!paymentProofUrl) {
+            addMoneyToastRef.current?.show({ type: 'error', text1: 'Proof Required', text2: 'Please upload a payment screenshot' });
+            return;
+        }
+
+        try {
+            await addMoney({
+                amount,
+                payment_method: 'upi',
+                payment_id: 'MANUAL_UPLOAD',
+                payment_proof: paymentProofUrl,
+                remarks: addMoneyRemarks || 'Funds added via UPI screenshot'
+            }).unwrap();
+
+            setIsAddModalVisible(false);
+            Toast.show({ type: 'success', text1: 'Success', text2: `₹${amount} add request submitted` });
+
+            setAddMoneyAmount('');
+            setAddMoneyRemarks('');
+            setPaymentProofUrl('');
+            refetchBalance();
+            refetchTransactions();
+        } catch (error: any) {
+            addMoneyToastRef.current?.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error?.data?.message || 'Failed to submit request'
+            });
+        }
+    };
+
+    const handleWithdrawal = async () => {
+        const amount = parseFloat(withdrawAmount);
+        if (!amount || amount <= 0) {
+            withdrawToastRef.current?.show({ type: 'error', text1: 'Invalid Amount', text2: 'Please enter a valid amount' });
+            return;
+        }
+
+        if (amount > balance) {
+            withdrawToastRef.current?.show({ type: 'error', text1: 'Insufficient Balance', text2: 'You cannot withdraw more than your balance' });
+            return;
+        }
+
+        if (!bankDetails.account_number || !bankDetails.ifsc_code || !bankDetails.account_holder_name) {
+            withdrawToastRef.current?.show({ type: 'error', text1: 'Missing Info', text2: 'Please fill all bank details' });
+            return;
+        }
+
+        try {
+            await requestWithdrawal({
+                amount,
+                bank_account: bankDetails
+            }).unwrap();
+
+            setIsWithdrawModalVisible(false);
+            Toast.show({ type: 'success', text1: 'Request Sent', text2: 'Withdrawal request submitted successfully' });
+
+            setWithdrawAmount('');
+            setBankDetails({ account_number: '', ifsc_code: '', account_holder_name: '' });
+            refetchBalance();
+            refetchTransactions();
+        } catch (error: any) {
+            withdrawToastRef.current?.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error?.data?.message || 'Failed to request withdrawal'
+            });
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'completed': return '#10B981';
+            case 'pending': return '#F59E0B';
+            case 'rejected':
+            case 'cancelled': return '#EF4444';
+            default: return theme.colors.muted;
+        }
+    };
+
+    return (
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <WalletHeader />
+
+            <ScrollView
+                refreshControl={
+                    <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+                }
+                contentContainerStyle={styles.content}
+            >
+                {/* Balance Card */}
+                <View style={[styles.balanceCard, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.balanceLabel}>Current Balance</Text>
+                    {isLoadingBalance ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.balanceAmount}>₹{balance.toFixed(2)}</Text>
+                    )}
+                    <View style={styles.cardInfo}>
+                        <View>
+                            <Text style={styles.infoLabel}>Account Status</Text>
+                            <Text style={styles.infoValue}>Active</Text>
+                        </View>
+                        <Ionicons name="card-outline" size={40} color="rgba(255,255,255,0.3)" />
                     </View>
-                    <View style={styles.transactionRight}>
-                      <Text
-                        style={[
-                          styles.transactionAmount,
-                          {
-                            color:
-                              transaction.transaction_type === 'deposit' ? '#10B981' : theme.colors.text,
-                          },
-                        ]}
-                      >
-                        {transaction.transaction_type === 'deposit' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
-                      </Text>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: getStatusColor(transaction.status) + '20' },
-                        ]}
-                      >
-                        <Text style={[styles.statusText, { color: getStatusColor(transaction.status) }]}>
-                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
+                </View>
 
-        {activeTab === 'add-money' && (
-          <View style={styles.tabContent}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Add Money to Wallet</Text>
-            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card }]}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount</Text>
-              <View style={styles.amountInputWrapper}>
-                <Text style={[styles.currencySymbol, { color: theme.colors.text }]}>₹</Text>
-                <TextInput
-                  style={[styles.amountInput, { color: theme.colors.text }]}
-                  placeholder="Enter amount (min ₹10)"
-                  placeholderTextColor={theme.colors.muted}
-                  value={addMoneyAmount}
-                  onChangeText={(text) => handleAmountChange(text, setAddMoneyAmount)}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={styles.quickAmounts}>
-                {[100, 500, 1000, 2000].map((amount) => (
-                  <TouchableOpacity
-                    key={amount}
-                    style={[styles.quickAmountButton, { backgroundColor: theme.colors.background }]}
-                    onPress={() => setAddMoneyAmount(amount.toString())}
-                  >
-                    <Text style={[styles.quickAmountText, { color: theme.colors.text }]}>₹{amount}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card }]}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Remarks (Optional)</Text>
-              <TextInput
-                style={[styles.remarksInput, { color: theme.colors.text, backgroundColor: theme.colors.background }]}
-                placeholder="e.g., Payment reference, UPI ID used, etc."
-                placeholderTextColor={theme.colors.muted}
-                value={addMoneyRemarks}
-                onChangeText={setAddMoneyRemarks}
-                multiline
-                numberOfLines={2}
-              />
-              <Text style={[styles.helperText, { color: theme.colors.muted }]}>
-                Add any reference details to help admin verify your payment
-              </Text>
-            </View>
+                {/* Quick Actions */}
+                <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: theme.colors.card }]}
+                        onPress={() => setIsAddModalVisible(true)}
+                    >
+                        <View style={[styles.actionIcon, { backgroundColor: '#E0F2FE' }]}>
+                            <Ionicons name="add" size={24} color="#0EA5E9" />
+                        </View>
+                        <Text style={[styles.actionText, { color: theme.colors.text }]}>Add Money</Text>
+                    </TouchableOpacity>
 
-            {/* UPI Payment Details Section */}
-            <View style={[styles.paymentInstructionContainer, { backgroundColor: 'rgba(59, 130, 246, 0.05)', borderColor: theme.colors.primary }]}>
-              <Text style={[styles.instructionTitle, { color: theme.colors.primary }]}>Payment Instructions</Text>
-              <Text style={[styles.instructionText, { color: theme.colors.text }]}>
-                1. Open your preferred UPI app (Google Pay, PhonePe, etc.)
-              </Text>
-              <Text style={[styles.instructionText, { color: theme.colors.text }]}>
-                2. Pay ₹{addMoneyAmount || '0'} to the UPI ID below:
-              </Text>
+                    <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: theme.colors.card }]}
+                        onPress={() => setIsWithdrawModalVisible(true)}
+                    >
+                        <View style={[styles.actionIcon, { backgroundColor: '#DCFCE7' }]}>
+                            <Ionicons name="arrow-undo" size={24} color="#22C55E" />
+                        </View>
+                        <Text style={[styles.actionText, { color: theme.colors.text }]}>Transfer</Text>
+                    </TouchableOpacity>
+                </View>
 
-              <View style={[styles.upiIdContainer, { backgroundColor: theme.colors.card }]}>
-                {isLoadingSettings ? (
-                   <ActivityIndicator size="small" color={theme.colors.primary} />
-                ) : (
-                   <Text style={[styles.upiIdText, { color: theme.colors.text }]}>{upiId}</Text>
-                )}
-                <TouchableOpacity
-                  onPress={() => {
-                    // In a real app, you'd copy to clipboard here
-                    // TODO: Implement actual clipboard copy using expo-clipboard
-                    Toast.show({
-                      type: 'success',
-                      text1: 'Copied',
-                      text2: 'UPI ID copied to clipboard',
-                    });
-                  }}
-                >
-                  <Ionicons name="copy-outline" size={20} color={theme.colors.primary} />
-                </TouchableOpacity>
-              </View>
+                {/* Recent Transactions */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Transactions</Text>
 
-              <Text style={[styles.instructionText, { color: theme.colors.text, marginTop: 8 }]}>
-                3. Enter the UPI Transaction ID / Ref No. below:
-              </Text>
-              <TextInput
-                style={[styles.transactionIdInput, { color: theme.colors.text, backgroundColor: theme.colors.card, borderColor: theme.colors.muted + '40' }]}
-                placeholder="UPI Transaction ID (12 digits)"
-                placeholderTextColor={theme.colors.muted}
-                value={transactionId}
-                onChangeText={setTransactionId}
-              />
-
-              <Text style={[styles.instructionText, { color: theme.colors.text, marginTop: 8 }]}>
-                4. Upload the screenshot of the successful payment:
-              </Text>
-              <View style={styles.uploadWrapper}>
-                <ImageUpload
-                  onUploadComplete={(url) => setPaymentProofUrl(url)}
-                  initialImage={paymentProofUrl || undefined}
-                  folder={paymentFolder}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                { backgroundColor: theme.colors.primary },
-                (!addMoneyAmount || !transactionId || !paymentProofUrl) && styles.disabledButton
-              ]}
-              onPress={handleAddMoney}
-              disabled={isAddingMoney || !addMoneyAmount || !transactionId || !paymentProofUrl}
-            >
-              {isAddingMoney ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Submit Request</Text>
-              )}
-            </TouchableOpacity>
-            <Text style={[styles.noteText, { color: theme.colors.muted }]}>
-              Note: Your wallet will be credited once the admin approves your request.
-            </Text>
-          </View>
-        )}
-
-        {activeTab === 'withdraw' && (
-          <View style={styles.tabContent}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Request Withdrawal</Text>
-            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card }]}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Amount</Text>
-              <View style={styles.amountInputWrapper}>
-                <Text style={[styles.currencySymbol, { color: theme.colors.text }]}>₹</Text>
-                <TextInput
-                  style={[styles.amountInput, { color: theme.colors.text }]}
-                  placeholder="Enter amount (min ₹100)"
-                  placeholderTextColor={theme.colors.muted}
-                  value={withdrawAmount}
-                  onChangeText={(text) => handleAmountChange(text, setWithdrawAmount)}
-                  keyboardType="numeric"
-                />
-              </View>
-              <Text style={[styles.helperText, { color: theme.colors.muted }]}>
-                Available balance: ₹{balance.toFixed(2)}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.secondaryButton, { backgroundColor: theme.colors.card }]}
-              onPress={() => setShowWithdrawModal(true)}
-            >
-              <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
-                {bankDetails.account_number ? 'Update Bank Details' : 'Add Bank Details'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.muted} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                { backgroundColor: theme.colors.primary },
-                (!withdrawAmount || !bankDetails.account_number) && styles.disabledButton,
-              ]}
-              onPress={handleWithdraw}
-              disabled={isRequestingWithdrawal || !withdrawAmount || !bankDetails.account_number}
-            >
-              {isRequestingWithdrawal ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Request Withdrawal</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Bank Details Modal */}
-      <Modal visible={showWithdrawModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Bank Account Details</Text>
-              <TouchableOpacity onPress={() => setShowWithdrawModal(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Account Holder Name</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.colors.card, color: theme.colors.text }]}
-                  placeholder="Enter account holder name"
-                  placeholderTextColor={theme.colors.muted}
-                  value={bankDetails.account_holder_name}
-                  onChangeText={(text) => setBankDetails({ ...bankDetails, account_holder_name: text })}
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Account Number</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.colors.card, color: theme.colors.text }]}
-                  placeholder="Enter account number"
-                  placeholderTextColor={theme.colors.muted}
-                  value={bankDetails.account_number}
-                  onChangeText={(text) => setBankDetails({ ...bankDetails, account_number: text })}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>IFSC Code</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.colors.card, color: theme.colors.text }]}
-                  placeholder="Enter IFSC code"
-                  placeholderTextColor={theme.colors.muted}
-                  value={bankDetails.ifsc_code}
-                  onChangeText={(text) => setBankDetails({ ...bankDetails, ifsc_code: text.toUpperCase() })}
-                  autoCapitalize="characters"
-                />
-              </View>
+                    {transactions.length > 0 ? (
+                        transactions.map((tx: any) => (
+                            <View key={tx._id} style={[styles.transactionItem, { backgroundColor: theme.colors.card }]}>
+                                <View style={[styles.txIcon, { backgroundColor: tx.transaction_type === 'deposit' ? '#DCFCE7' : '#FEF2F2' }]}>
+                                    <Ionicons
+                                        name={tx.transaction_type === 'deposit' ? 'arrow-down' : 'arrow-up'}
+                                        size={20}
+                                        color={tx.transaction_type === 'deposit' ? '#22C55E' : '#EF4444'}
+                                    />
+                                </View>
+                                <View style={styles.txDetails}>
+                                    <Text style={[styles.txTitle, { color: theme.colors.text }]}>
+                                        {tx.transaction_type === 'deposit'
+                                            ? (tx.status === 'completed' ? 'Money Added' : 'Deposit Request')
+                                            : 'Withdrawal Request'}
+                                    </Text>
+                                    <Text style={[styles.txDate, { color: theme.colors.muted }]}>
+                                        {new Date(tx.createdAt).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={[styles.txAmount, { color: tx.transaction_type === 'deposit' ? '#22C55E' : theme.colors.text }]}>
+                                        {tx.transaction_type === 'deposit' ? '+' : '-'}₹{tx.amount.toFixed(2)}
+                                    </Text>
+                                    <Text style={[styles.txStatus, { color: getStatusColor(tx.status) }]}>
+                                        {tx.status}
+                                    </Text>
+                                </View>
+                            </View>
+                        ))
+                    ) : (
+                        <View style={styles.emptyContainer}>
+                            <Ionicons name="receipt-outline" size={48} color={theme.colors.muted} />
+                            <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No transactions yet</Text>
+                        </View>
+                    )}
+                </View>
             </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => setShowWithdrawModal(false)}
-              >
-                <Text style={styles.primaryButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+
+            <Toast />
+
+            {/* Add Money Modal */}
+            <Modal
+                visible={isAddModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setIsAddModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <Pressable style={styles.modalDismiss} onPress={() => setIsAddModalVisible(false)} />
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.card, maxHeight: '90%' }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Add Money</Text>
+                            <TouchableOpacity onPress={() => setIsAddModalVisible(false)}>
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {/* Amount Input */}
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Amount (₹)</Text>
+                            <TextInput
+                                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text, fontSize: 20, fontWeight: '700' }]}
+                                placeholder="0"
+                                placeholderTextColor={theme.colors.muted}
+                                keyboardType="numeric"
+                                value={addMoneyAmount}
+                                onChangeText={setAddMoneyAmount}
+                            />
+
+                            <View style={styles.quickAmounts}>
+                                {[100, 500, 1000, 2000].map((amt) => (
+                                    <TouchableOpacity
+                                        key={amt}
+                                        style={[styles.quickAmountButton, { backgroundColor: theme.colors.background }]}
+                                        onPress={() => setAddMoneyAmount(amt.toString())}
+                                    >
+                                        <Text style={[styles.quickAmountText, { color: theme.colors.text }]}>₹{amt}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>Remarks (Optional)</Text>
+                            <TextInput
+                                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]}
+                                placeholder="e.g. UPI Ref"
+                                placeholderTextColor={theme.colors.muted}
+                                value={addMoneyRemarks}
+                                onChangeText={setAddMoneyRemarks}
+                            />
+
+                            {/* Payment Instructions */}
+                            <View style={[styles.paymentInstructionContainer, { backgroundColor: 'rgba(59, 130, 246, 0.05)', borderColor: theme.colors.primary }]}>
+                                <Text style={[styles.instructionTitle, { color: theme.colors.primary }]}>Payment Instructions</Text>
+                                <Text style={[styles.instructionText, { color: theme.colors.text }]}>
+                                    1. Pay ₹{addMoneyAmount || '0'} to UPI ID:
+                                </Text>
+                                <View style={[styles.upiIdContainer, { backgroundColor: theme.colors.background }]}>
+                                    <Text style={[styles.upiIdText, { color: theme.colors.text }]}>{upiId}</Text>
+                                    <TouchableOpacity onPress={() => addMoneyToastRef.current?.show({ type: 'success', text1: 'Copied', text2: 'UPI ID copied to clipboard' })}>
+                                        <Ionicons name="copy-outline" size={20} color={theme.colors.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                                <Text style={[styles.instructionText, { color: theme.colors.text, marginTop: 8 }]}>
+                                    2. Upload Payment Proof below:
+                                </Text>
+                            </View>
+
+                            {/* Custom Upload Button */}
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Payment Screenshot</Text>
+                            <TouchableOpacity
+                                style={[styles.uploadButton, { borderColor: theme.colors.primary }]}
+                                onPress={pickImage}
+                                disabled={isUploading}
+                            >
+                                {isUploading ? (
+                                    <ActivityIndicator color={theme.colors.primary} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="cloud-upload-outline" size={24} color={theme.colors.primary} />
+                                        <Text style={[styles.uploadButtonText, { color: theme.colors.primary }]}>
+                                            {paymentProofUrl ? "Change Screenshot" : "Click to Upload Screenshot"}
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            {paymentProofUrl && (
+                                <View style={styles.previewContainer}>
+                                    <Image source={{ uri: paymentProofUrl }} style={styles.previewImage} />
+                                    <TouchableOpacity
+                                        style={styles.removePreview}
+                                        onPress={() => setPaymentProofUrl('')}
+                                    >
+                                        <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            <TouchableOpacity
+                                style={[styles.submitButton, { backgroundColor: theme.colors.primary, marginTop: 16 }]}
+                                onPress={handleAddMoney}
+                                disabled={isAddingMoney}
+                            >
+                                {isAddingMoney ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.submitButtonText}>Submit Request</Text>
+                                )}
+                            </TouchableOpacity>
+                            <View style={{ height: 20 }} />
+                        </ScrollView>
+                    </View>
+                    <Toast ref={addMoneyToastRef} config={toastConfig} />
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Withdrawal Modal */}
+            <Modal
+                visible={isWithdrawModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setIsWithdrawModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <Pressable style={styles.modalDismiss} onPress={() => setIsWithdrawModalVisible(false)} />
+                    <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+                        <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+                            <View style={styles.modalHeader}>
+                                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Withdraw/Transfer</Text>
+                                <TouchableOpacity onPress={() => setIsWithdrawModalVisible(false)}>
+                                    <Ionicons name="close" size={24} color={theme.colors.text} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Withdrawal Amount (₹)</Text>
+                            <TextInput
+                                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]}
+                                placeholder="Enter amount"
+                                placeholderTextColor={theme.colors.muted}
+                                keyboardType="numeric"
+                                value={withdrawAmount}
+                                onChangeText={setWithdrawAmount}
+                            />
+
+                            <View style={styles.divider} />
+                            <Text style={styles.sectionSubTitle}>Bank Details</Text>
+
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 12 }]}>Account Holder Name</Text>
+                            <TextInput
+                                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]}
+                                placeholder="Name as per bank"
+                                placeholderTextColor={theme.colors.muted}
+                                value={bankDetails.account_holder_name}
+                                onChangeText={(val) => setBankDetails({ ...bankDetails, account_holder_name: val })}
+                            />
+
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 12 }]}>Account Number</Text>
+                            <TextInput
+                                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]}
+                                placeholder="Account Number"
+                                placeholderTextColor={theme.colors.muted}
+                                keyboardType="numeric"
+                                value={bankDetails.account_number}
+                                onChangeText={(val) => setBankDetails({ ...bankDetails, account_number: val })}
+                            />
+
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 12 }]}>IFSC Code</Text>
+                            <TextInput
+                                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]}
+                                placeholder="IFSC Code"
+                                placeholderTextColor={theme.colors.muted}
+                                autoCapitalize="characters"
+                                value={bankDetails.ifsc_code}
+                                onChangeText={(val) => setBankDetails({ ...bankDetails, ifsc_code: val })}
+                            />
+
+                            <TouchableOpacity
+                                style={[styles.submitButton, { backgroundColor: theme.colors.primary, marginTop: 24 }]}
+                                onPress={handleWithdrawal}
+                                disabled={isWithdrawing}
+                            >
+                                {isWithdrawing ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.submitButtonText}>Request Withdrawal</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
+                    <Toast ref={withdrawToastRef} config={toastConfig} />
+                </KeyboardAvoidingView>
+            </Modal>
         </View>
-      </Modal>
-    </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  balanceCard: {
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  balanceLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 8,
-  },
-  balanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: '#fff',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  activeTabText: {
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  tabContent: {
-    marginTop: 8,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  inputContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  amountInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    paddingBottom: 8,
-    marginBottom: 16,
-  },
-  currencySymbol: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  quickAmounts: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  quickAmountButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  quickAmountText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  helperText: {
-    fontSize: 12,
-    marginTop: 8,
-  },
-  remarksInput: {
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    marginTop: 8,
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  noteText: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 12,
-    paddingHorizontal: 16,
-  },
-  primaryButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 14,
-    marginTop: 12,
-  },
-  transactionsList: {
-    gap: 12,
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-  },
-  transactionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  transactionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  transactionDetails: {
-    flex: 1,
-  },
-  transactionType: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  transactionDate: {
-    fontSize: 12,
-  },
-  transactionRight: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  modalBody: {
-    padding: 16,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  textInput: {
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginTop: 8,
-  },
-  modalFooter: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  paymentInstructionContainer: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  instructionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  instructionText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  upiIdContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  upiIdText: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'monospace',
-  },
-  transactionIdInput: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 4,
-    fontSize: 14,
-  },
-  uploadWrapper: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
+    container: {
+        flex: 1,
+    },
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    content: {
+        padding: 16,
+    },
+    balanceCard: {
+        padding: 24,
+        borderRadius: 24,
+        marginBottom: 24,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 8,
+    },
+    balanceLabel: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    balanceAmount: {
+        color: '#fff',
+        fontSize: 36,
+        fontWeight: '800',
+        marginBottom: 24,
+    },
+    cardInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+    },
+    infoLabel: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 12,
+        marginBottom: 2,
+    },
+    infoValue: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    actionsRow: {
+        flexDirection: 'row',
+        gap: 16,
+        marginBottom: 24,
+    },
+    actionButton: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        gap: 8,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
+    },
+    actionIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionText: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    section: {
+        gap: 12,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    transactionItem: {
+        flexDirection: 'row',
+        padding: 12,
+        borderRadius: 16,
+        alignItems: 'center',
+        gap: 12,
+    },
+    txIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    txDetails: {
+        flex: 1,
+    },
+    txTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    txDate: {
+        fontSize: 12,
+    },
+    txAmount: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    txStatus: {
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    emptyContainer: {
+        paddingVertical: 40,
+        alignItems: 'center',
+        gap: 12,
+    },
+    emptyText: {
+        fontSize: 14,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalDismiss: {
+        flex: 1,
+    },
+    modalContent: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 16,
+        marginBottom: 16,
+    },
+    quickAmounts: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
+    },
+    quickAmountButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    quickAmountText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    paymentInstructionContainer: {
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 16,
+    },
+    instructionTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    instructionText: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    upiIdContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 8,
+    },
+    upiIdText: {
+        fontSize: 14,
+        fontWeight: '600',
+        fontFamily: 'monospace',
+    },
+    submitButton: {
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    submitButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+        marginVertical: 16,
+    },
+    sectionSubTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    uploadButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        marginBottom: 16,
+        gap: 8,
+    },
+    uploadButtonText: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    previewContainer: {
+        position: 'relative',
+        width: '100%',
+        height: 200,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 16,
+        backgroundColor: '#F8FAFC',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'contain',
+    },
+    removePreview: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+    },
 });
-

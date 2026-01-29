@@ -1,27 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View, Platform } from "react-native";
 import { useTheme } from "../_theme/ThemeProvider";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import StoreHeader from "../components/headers/StoreHeader";
 import HomeHeader from "../components/headers/HomeHeader";
 import OrdersHeader from "../components/headers/OrdersHeader";
 
 export default function RootLayout() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
       screenOptions={{
         tabBarShowLabel: false,
+        tabBarHideOnKeyboard: true, // Useful on Android
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.muted,
         tabBarStyle: {
           backgroundColor: theme.colors.card,
           borderTopWidth: 0,
-          height: 64,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          height: Platform.OS === 'ios' ? 88 : 70 + (insets.bottom > 0 ? insets.bottom : 0),
+          paddingBottom: Platform.OS === 'ios' ? 30 : (insets.bottom > 0 ? insets.bottom : 12),
+          paddingTop: 12,
         },
         tabBarItemStyle: {
-          paddingVertical: 8,
+          height: 48,
         },
       }}
     >
@@ -32,7 +42,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "home-sharp" : "home-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: true,
@@ -51,7 +61,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "water-sharp" : "water-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: false, // Hide default header since we have custom header
@@ -65,7 +75,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "bicycle" : "bicycle-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: false, // Use custom header in component
@@ -79,7 +89,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "storefront-sharp" : "storefront-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: true,
@@ -93,7 +103,7 @@ export default function RootLayout() {
             <Ionicons
               name={focused ? "receipt-sharp" : "receipt-outline"}
               color={color}
-              size={24}
+              size={28} // Increased size
             />
           ),
           headerShown: true,
@@ -105,7 +115,7 @@ export default function RootLayout() {
           title: "Profile",
           tabBarLabel: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person-sharp" : "person-outline"} color={color} size={24} />
+            <Ionicons name={focused ? "person-sharp" : "person-outline"} color={color} size={28} />
           ),
           headerShown: true,
         }}
@@ -115,8 +125,7 @@ export default function RootLayout() {
         options={{
           title: "Cart",
           href: null,
-          // tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
-          headerShown: false, // Use custom header in component
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -124,8 +133,7 @@ export default function RootLayout() {
         options={{
           title: "Wallet",
           href: null,
-          // tabBarButton: () => null, // Hide from tab bar but keep accessible via navigation
-          headerShown: false, // Use custom header in component
+          headerShown: false,
         }}
       />
     </Tabs>

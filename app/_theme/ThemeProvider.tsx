@@ -19,7 +19,7 @@ export type Theme = {
 
 const lightTheme: Theme = {
   colors: {
-    primary: '#FF5C00',    // Purple matching login/signup
+    primary: '#5b7b40',  // Purple matching login/signup
     background: '#F9FAFB', // Light gray background
     card: '#FFFFFF',       // White cards
     text: '#1F2937',       // Dark gray text

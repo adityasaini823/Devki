@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import {
     View,
@@ -10,15 +10,15 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    TouchableWithoutFeedback,
     ActivityIndicator,
-    Alert,
     Animated,
     Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../_theme/ThemeProvider';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCompleteProfileMutation } from '../../src/redux/api/authApi';
 import { tokenStorage } from '../../src/utils/tokenStorage';
 
@@ -37,6 +37,7 @@ interface InputFieldProps {
     maxLength?: number;
     secureTextEntry?: boolean;
     inputRef?: React.RefObject<TextInput | null>;
+    error?: string;
 }
 
 const ModernInput: React.FC<InputFieldProps> = ({
@@ -54,10 +55,17 @@ const ModernInput: React.FC<InputFieldProps> = ({
     maxLength,
     secureTextEntry = false,
     inputRef,
+    error,
 }) => {
     const { theme } = useTheme();
     const [isFocused, setIsFocused] = useState(false);
     const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePress = () => {
+        if (inputRef && 'current' in inputRef && inputRef.current) {
+            inputRef.current.focus();
+        }
+    };
 
     const handleFocus = () => {
         setIsFocused(true);
@@ -79,58 +87,66 @@ const ModernInput: React.FC<InputFieldProps> = ({
     const showLabel = isFocused || hasValue;
 
     return (
-        <Animated.View style={[styles.inputContainer, { transform: [{ scale: scaleAnim }] }]}>
-            <View style={[
-                styles.inputWrapper, 
-                isFocused && [
-                    styles.inputWrapperFocused,
-                    {
-                        borderColor: theme.colors.primary,
-                        shadowColor: theme.colors.primary,
-                    }
-                ]
-            ]}>
-                <View style={styles.iconContainer}>
-                    <Ionicons
-                        name={icon}
-                        size={20}
-                        color={isFocused ? theme.colors.primary : '#9CA3AF'}
-                    />
-                </View>
-                <View style={styles.inputContent}>
-                    {showLabel && (
-                        <Animated.View style={styles.floatingLabel}>
-                            <Text style={[styles.floatingLabelText, { color: theme.colors.primary }]}>
-                                {label} {required && <Text style={styles.required}>*</Text>}
-                            </Text>
-                        </Animated.View>
-                    )}
-                    <TextInput
-                        ref={inputRef}
-                        style={[
-                            styles.modernInput,
-                            multiline && styles.modernInputMultiline,
-                            { color: '#111827' },
-                        ]}
-                        placeholder={showLabel ? '' : placeholder}
-                        placeholderTextColor="#9CA3AF"
-                        value={value}
-                        onChangeText={onChangeText}
-                        onFocus={handleFocus}
-                        onBlur={handleBlur}
-                        keyboardType={keyboardType}
-                        autoCapitalize={autoCapitalize}
-                        returnKeyType={returnKeyType}
-                        onSubmitEditing={onSubmitEditing}
-                        multiline={multiline}
-                        numberOfLines={multiline ? 3 : 1}
-                        textAlignVertical={multiline ? 'top' : 'center'}
-                        maxLength={maxLength}
-                        secureTextEntry={secureTextEntry}
-                    />
-                </View>
-            </View>
-        </Animated.View>
+        <View style={styles.fieldContainer}>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={handlePress}
+                    style={[
+                        styles.inputWrapper,
+                        isFocused && [
+                            styles.inputWrapperFocused,
+                            {
+                                borderColor: theme.colors.primary,
+                                shadowColor: theme.colors.primary,
+                            }
+                        ],
+                        error && { borderColor: '#EF4444', backgroundColor: '#FEF2F2' }
+                    ]}
+                >
+                    <View style={styles.iconContainer}>
+                        <Ionicons
+                            name={icon}
+                            size={20}
+                            color={error ? '#EF4444' : (isFocused ? theme.colors.primary : '#9CA3AF')}
+                        />
+                    </View>
+                    <View style={styles.inputContent}>
+                        {showLabel && (
+                            <View style={styles.floatingLabel}>
+                                <Text style={[styles.floatingLabelText, { color: error ? '#EF4444' : theme.colors.primary }]}>
+                                    {label} {required && <Text style={styles.required}>*</Text>}
+                                </Text>
+                            </View>
+                        )}
+                        <TextInput
+                            ref={inputRef as any}
+                            style={[
+                                styles.modernInput,
+                                multiline && styles.modernInputMultiline,
+                                { color: '#111827' },
+                            ]}
+                            placeholder={showLabel ? '' : placeholder}
+                            placeholderTextColor="#9CA3AF"
+                            value={value}
+                            onChangeText={onChangeText}
+                            onFocus={handleFocus}
+                            onBlur={handleBlur}
+                            keyboardType={keyboardType}
+                            autoCapitalize={autoCapitalize}
+                            returnKeyType={returnKeyType}
+                            onSubmitEditing={onSubmitEditing}
+                            multiline={multiline}
+                            numberOfLines={multiline ? 3 : 1}
+                            textAlignVertical={multiline ? 'top' : 'center'}
+                            maxLength={maxLength}
+                            secureTextEntry={secureTextEntry}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </Animated.View>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
     );
 };
 
@@ -138,9 +154,9 @@ export default function SignupDetails() {
     const router = useRouter();
     const { theme } = useTheme();
     const params = useLocalSearchParams();
-    
+
     const phoneNumber = (params.phone as string) || '';
-    
+
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
@@ -149,12 +165,14 @@ export default function SignupDetails() {
     const [state, setState] = useState('');
     const [pincode, setPincode] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
-    
+
+    // Error state
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
     const [completeProfile, { isLoading }] = useCompleteProfileMutation();
-    
-    const scaleAnim = useRef(new Animated.Value(0)).current;
-    const checkmarkAnim = useRef(new Animated.Value(0)).current;
-    
+
+    // Refs
+    const scrollRef = useRef<ScrollView>(null);
     const firstNameRef = useRef<TextInput>(null);
     const lastNameRef = useRef<TextInput>(null);
     const emailRef = useRef<TextInput>(null);
@@ -162,17 +180,71 @@ export default function SignupDetails() {
     const cityRef = useRef<TextInput>(null);
     const stateRef = useRef<TextInput>(null);
     const pincodeRef = useRef<TextInput>(null);
-    
-    const isFormValid = () => {
-        return (
-            firstName.trim().length >= 2 &&
-            address.trim().length >= 5 &&
-            city.trim().length >= 2 &&
-            state.trim().length >= 2 &&
-            pincode.trim().length === 6
-        );
+
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+    const successScaleAnim = useRef(new Animated.Value(0)).current;
+    const checkmarkAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 800,
+                useNativeDriver: true,
+            })
+        ]).start();
+    }, []);
+
+    const validateForm = () => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!firstName.trim()) {
+            newErrors.firstName = 'First name is required';
+        } else if (firstName.trim().length < 2) {
+            newErrors.firstName = 'Name must be at least 2 characters';
+        }
+
+        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            newErrors.email = 'Please enter a valid email address';
+        }
+
+        if (!address.trim()) {
+            newErrors.address = 'Full address is required';
+        } else if (address.trim().length < 5) {
+            newErrors.address = 'Please enter a more detailed address';
+        }
+
+        if (!city.trim()) {
+            newErrors.city = 'City is required';
+        }
+
+        if (!state.trim()) {
+            newErrors.state = 'State is required';
+        }
+
+        if (!pincode.trim()) {
+            newErrors.pincode = 'Pincode is required';
+        } else if (pincode.trim().length !== 6) {
+            newErrors.pincode = 'Pincode must be exactly 6 digits';
+        }
+
+        setErrors(newErrors);
+
+        if (Object.keys(newErrors).length > 0) {
+            // Scroll to top to show errors
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+            return false;
+        }
+        return true;
     };
-    
+
     const completedFields = [
         firstName.trim().length >= 2,
         address.trim().length >= 5,
@@ -180,21 +252,21 @@ export default function SignupDetails() {
         state.trim().length >= 2,
         pincode.trim().length === 6,
     ].filter(Boolean).length;
-    
+
     const progress = (completedFields / 5) * 100;
-    
+
     const handleSubmit = async () => {
-        if (!isFormValid()) {
+        if (!validateForm()) {
             Toast.show({
                 type: 'error',
-                text1: 'Almost There!',
-                text2: 'Please complete all required fields to continue.',
+                text1: 'Validation Error',
+                text2: 'Please check the highlighted fields.',
             });
             return;
         }
-        
+
         Keyboard.dismiss();
-        
+
         try {
             const response = await completeProfile({
                 mobile: phoneNumber.replace(/\D/g, ''),
@@ -206,24 +278,14 @@ export default function SignupDetails() {
                 state: state.trim(),
                 pincode: pincode.trim(),
             }).unwrap();
-            
-            // Store tokens and user data
-            if (response.token) {
-                await tokenStorage.saveToken(response.token);
-            }
-            if (response.refreshToken) {
-                await tokenStorage.saveRefreshToken(response.refreshToken);
-            }
-            if (response.user) {
-                await tokenStorage.saveUser(response.user);
-            }
-            
-            // Show success confirmation
+
+            if (response.token) await tokenStorage.saveToken(response.token);
+            if (response.refreshToken) await tokenStorage.saveRefreshToken(response.refreshToken);
+            if (response.user) await tokenStorage.saveUser(response.user);
+
             setShowSuccess(true);
-            
-            // Animate success modal
             Animated.sequence([
-                Animated.spring(scaleAnim, {
+                Animated.spring(successScaleAnim, {
                     toValue: 1,
                     useNativeDriver: true,
                     tension: 50,
@@ -235,136 +297,161 @@ export default function SignupDetails() {
                     useNativeDriver: true,
                 }),
             ]).start();
-            
-            // Navigate to home after 2 seconds
+
             setTimeout(() => {
                 router.replace('/(tabs)');
             }, 2000);
         } catch (error: any) {
             Toast.show({
                 type: 'error',
-                text1: 'Error',
-                text2: error?.data?.message || error?.message || 'Failed to complete profile. Please check your connection and try again.',
+                text1: 'Setup Failed',
+                text2: error?.data?.message || error?.message || 'Failed to complete profile. Try again.',
             });
         }
     };
-    
-    const formatPincode = (text: string) => {
-        const cleaned = text.replace(/\D/g, '');
-        return cleaned.slice(0, 6);
-    };
-    
+
+    const formatPincode = (text: string) => text.replace(/\D/g, '').slice(0, 6);
+
     return (
-        <KeyboardAvoidingView
-            style={styles.keyboardView}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-            <View style={styles.container}>
-                {/* Header with Progress */}
+        <View style={styles.container}>
+            <LinearGradient
+                colors={[theme.colors.primary + '10', '#FFFFFF']}
+                style={StyleSheet.absoluteFill}
+            />
+
+            <KeyboardAvoidingView
+                style={styles.keyboardView}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            >
+                {/* Fixed Header */}
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            style={styles.backButton}
-                        >
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                             <Ionicons name="arrow-back" size={24} color="#111827" />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Complete Profile</Text>
+                        <Text style={styles.headerTitle}>Account Setup</Text>
                         <View style={styles.placeholder} />
                     </View>
-                    
+
                     <View style={styles.progressContainer}>
                         <View style={styles.progressBar}>
                             <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.colors.primary }]} />
                         </View>
-                        <Text style={styles.progressText}>
-                            {completedFields} of 5 fields completed
-                        </Text>
+                        <Text style={styles.progressText}>{completedFields} of 5 required fields</Text>
                     </View>
                 </View>
-                
+
                 <ScrollView
+                    ref={scrollRef}
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <View style={styles.content}>
-                        {/* Welcome Section */}
+                    <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                        {/* Logo & Welcome */}
                         <View style={styles.welcomeSection}>
-                            <View style={styles.avatarContainer}>
-                                <Ionicons name="person" size={40} color={theme.colors.primary} />
+                            <View style={styles.logoWrapper}>
+                                <View style={styles.logoContainer}>
+                                    <Image
+                                        source={require('../../assets/images/devki-logo.png')}
+                                        style={styles.logo}
+                                        contentFit="contain"
+                                    />
+                                </View>
                             </View>
-                            <Text style={styles.welcomeTitle}>Let's get you set up!</Text>
-                            <Text style={styles.welcomeSubtitle}>
-                                We need a few details to personalize your experience
-                            </Text>
+                            <Text style={styles.welcomeTitle}>One last step!</Text>
+                            <Text style={styles.welcomeSubtitle}>Help us know you better for better care</Text>
                         </View>
-                        
-                        {/* Personal Info Card */}
+
+                        {/* Form Section */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
-                                <Ionicons name="person-circle-outline" size={24} color={theme.colors.primary} />
-                                <Text style={styles.cardTitle}>Personal Information</Text>
+                                <Ionicons name="person-outline" size={22} color={theme.colors.primary} />
+                                <Text style={styles.cardTitle}>Basic Details</Text>
                             </View>
-                            
+
                             <ModernInput
+                                inputRef={firstNameRef}
                                 icon="person-outline"
                                 label="First Name"
                                 value={firstName}
-                                onChangeText={setFirstName}
-                                placeholder="First Name"
+                                onChangeText={(val) => {
+                                    setFirstName(val);
+                                    if (errors.firstName) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.firstName;
+                                        return n;
+                                    });
+                                }}
+                                placeholder="e.g. Rahul"
                                 required
                                 autoCapitalize="words"
                                 returnKeyType="next"
                                 onSubmitEditing={() => lastNameRef.current?.focus()}
+                                error={errors.firstName}
                             />
-                            
+
                             <ModernInput
                                 inputRef={lastNameRef}
                                 icon="person-outline"
                                 label="Last Name"
                                 value={lastName}
                                 onChangeText={setLastName}
-                                placeholder="Last Name (Optional)"
+                                placeholder="e.g. Sharma (Optional)"
                                 autoCapitalize="words"
                                 returnKeyType="next"
                                 onSubmitEditing={() => emailRef.current?.focus()}
                             />
-                            
+
                             <ModernInput
                                 inputRef={emailRef}
                                 icon="mail-outline"
                                 label="Email"
                                 value={email}
-                                onChangeText={setEmail}
-                                placeholder="Email (Optional)"
+                                onChangeText={(val) => {
+                                    setEmail(val);
+                                    if (errors.email) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.email;
+                                        return n;
+                                    });
+                                }}
+                                placeholder="e.g. rahul@example.com (Optional)"
                                 keyboardType="email-address"
                                 returnKeyType="next"
                                 onSubmitEditing={() => addressRef.current?.focus()}
+                                error={errors.email}
                             />
                         </View>
-                        
-                        {/* Address Info Card */}
+
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
-                                <Ionicons name="location-outline" size={24} color={theme.colors.primary} />
-                                <Text style={styles.cardTitle}>Delivery Address</Text>
+                                <Ionicons name="location-outline" size={22} color={theme.colors.primary} />
+                                <Text style={styles.cardTitle}>Address Details</Text>
                             </View>
-                            
+
                             <ModernInput
                                 inputRef={addressRef}
                                 icon="home-outline"
-                                label="Complete Address"
+                                label="Full Address"
                                 value={address}
-                                onChangeText={setAddress}
-                                placeholder="House/Flat No., Street, Area"
+                                onChangeText={(val) => {
+                                    setAddress(val);
+                                    if (errors.address) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.address;
+                                        return n;
+                                    });
+                                }}
+                                placeholder="House No, Building, Street..."
                                 required
                                 multiline
                                 returnKeyType="next"
                                 onSubmitEditing={() => cityRef.current?.focus()}
+                                error={errors.address}
                             />
-                            
+
                             <View style={styles.row}>
                                 <View style={styles.halfWidth}>
                                     <ModernInput
@@ -372,149 +459,131 @@ export default function SignupDetails() {
                                         icon="business-outline"
                                         label="City"
                                         value={city}
-                                        onChangeText={setCity}
+                                        onChangeText={(val) => {
+                                            setCity(val);
+                                            if (errors.city) setErrors(prev => {
+                                                const n = { ...prev };
+                                                delete n.city;
+                                                return n;
+                                            });
+                                        }}
                                         placeholder="City"
                                         required
                                         autoCapitalize="words"
                                         returnKeyType="next"
                                         onSubmitEditing={() => stateRef.current?.focus()}
+                                        error={errors.city}
                                     />
                                 </View>
-                                
                                 <View style={styles.halfWidth}>
                                     <ModernInput
                                         inputRef={stateRef}
                                         icon="map-outline"
                                         label="State"
                                         value={state}
-                                        onChangeText={setState}
+                                        onChangeText={(val) => {
+                                            setState(val);
+                                            if (errors.state) setErrors(prev => {
+                                                const n = { ...prev };
+                                                delete n.state;
+                                                return n;
+                                            });
+                                        }}
                                         placeholder="State"
                                         required
                                         autoCapitalize="words"
                                         returnKeyType="next"
                                         onSubmitEditing={() => pincodeRef.current?.focus()}
+                                        error={errors.state}
                                     />
                                 </View>
                             </View>
-                            
+
                             <ModernInput
                                 inputRef={pincodeRef}
                                 icon="pin-outline"
                                 label="Pincode"
                                 value={pincode}
-                                onChangeText={(text) => setPincode(formatPincode(text))}
+                                onChangeText={(text) => {
+                                    setPincode(formatPincode(text));
+                                    if (errors.pincode) setErrors(prev => {
+                                        const n = { ...prev };
+                                        delete n.pincode;
+                                        return n;
+                                    });
+                                }}
                                 placeholder="6-digit Pincode"
                                 required
                                 keyboardType="number-pad"
                                 maxLength={6}
                                 returnKeyType="done"
                                 onSubmitEditing={handleSubmit}
+                                error={errors.pincode}
                             />
                         </View>
-                        
-                        {/* Submit Button */}
+
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
-                                isFormValid() && !isLoading && [
-                                    styles.submitButtonActive,
-                                    {
-                                        backgroundColor: theme.colors.primary,
-                                        shadowColor: theme.colors.primary,
-                                    }
-                                ],
+                                { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
+                                isLoading && { opacity: 0.7 }
                             ]}
                             onPress={handleSubmit}
-                            disabled={!isFormValid() || isLoading}
+                            disabled={isLoading}
                             activeOpacity={0.8}
                         >
                             {isLoading ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
                                 <>
-                                    <Text style={styles.submitButtonText}>Complete Setup</Text>
+                                    <Text style={styles.submitButtonText}>Create Account</Text>
                                     <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
                                 </>
                             )}
                         </TouchableOpacity>
-                        
+
                         <Text style={styles.helperText}>
-                            By continuing, you agree to our Terms of Service and Privacy Policy
+                            By creating an account, you agree to our terms and privacy policy.
                         </Text>
-                    </View>
+
+                        {/* Extra space for scrolling on small screens with keyboard */}
+                        <View style={{ height: 100 }} />
+                    </Animated.View>
                 </ScrollView>
-                
-                {/* Success Confirmation Modal */}
-                <Modal
-                    visible={showSuccess}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => {}}
-                >
+
+                {/* Success Modal */}
+                <Modal visible={showSuccess} transparent animationType="fade">
                     <View style={styles.modalOverlay}>
-                        <Animated.View
-                            style={[
-                                styles.successContainer,
-                                {
-                                    transform: [{ scale: scaleAnim }],
-                                },
-                            ]}
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.checkmarkCircle,
-                                    {
-                                        opacity: checkmarkAnim,
-                                        transform: [
-                                            {
-                                                scale: checkmarkAnim.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: [0.5, 1],
-                                                }),
-                                            },
-                                        ],
-                                    },
-                                ]}
-                            >
+                        <Animated.View style={[styles.successContainer, { transform: [{ scale: successScaleAnim }] }]}>
+                            <Animated.View style={[styles.checkmarkCircle, { opacity: checkmarkAnim }]}>
                                 <Ionicons name="checkmark" size={60} color="#FFFFFF" />
                             </Animated.View>
-                            
-                            <Text style={styles.successTitle}>Profile Created!</Text>
-                            <Text style={styles.successMessage}>
-                                Your profile has been successfully created. Welcome to Devki!
-                            </Text>
-                            
-                            <View style={styles.successLoader}>
-                                <ActivityIndicator size="small" color={theme.colors.primary} />
-                            </View>
+                            <Text style={styles.successTitle}>Welcome to Devki!</Text>
+                            <Text style={styles.successMessage}>Your profile is ready. Redirecting you...</Text>
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
                         </Animated.View>
                     </View>
                 </Modal>
-            </View>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+    },
     keyboardView: {
         flex: 1,
     },
-    container: {
-        flex: 1,
-        backgroundColor: '#F9FAFB',
-    },
     header: {
         backgroundColor: '#FFFFFF',
-        paddingTop: Platform.OS === 'ios' ? 50 : 20,
-        paddingBottom: 16,
-        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 60 : 30,
+        paddingBottom: 20,
+        paddingHorizontal: 24,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        borderBottomColor: '#F3F4F6',
     },
     headerTop: {
         flexDirection: 'row',
@@ -524,9 +593,10 @@ const styles = StyleSheet.create({
     },
     backButton: {
         padding: 4,
+        marginLeft: -4,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: '#111827',
     },
@@ -534,27 +604,27 @@ const styles = StyleSheet.create({
         width: 32,
     },
     progressContainer: {
-        marginTop: 8,
+        width: '100%',
     },
     progressBar: {
         height: 6,
-        backgroundColor: '#E5E7EB',
-        borderRadius: 3,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
         overflow: 'hidden',
         marginBottom: 8,
     },
     progressFill: {
         height: '100%',
-        borderRadius: 3,
+        borderRadius: 10,
     },
     progressText: {
         fontSize: 12,
         color: '#6B7280',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     scrollContent: {
-        padding: 20,
-        paddingBottom: 40,
+        padding: 24,
+        paddingBottom: 100, // Increased for better keyboard handling
     },
     content: {
         width: '100%',
@@ -563,23 +633,32 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 32,
     },
-    avatarContainer: {
+    logoWrapper: {
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 6,
+    },
+    logoContainer: {
         width: 80,
         height: 80,
-        borderRadius: 40,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 22,
+        padding: 6,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 16,
-        borderWidth: 3,
-        borderColor: '#E9D5FF',
+    },
+    logo: {
+        width: '100%',
+        height: '100%',
     },
     welcomeTitle: {
-        fontSize: 24,
-        fontWeight: '700',
+        fontSize: 26,
+        fontWeight: '800',
         color: '#111827',
-        marginBottom: 8,
-        textAlign: 'center',
+        marginBottom: 6,
     },
     welcomeSubtitle: {
         fontSize: 15,
@@ -589,44 +668,43 @@ const styles = StyleSheet.create({
     },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 20,
+        borderRadius: 20,
+        padding: 24,
         marginBottom: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
     },
     cardTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#111827',
-        marginLeft: 12,
+        marginLeft: 10,
     },
-    inputContainer: {
+    fieldContainer: {
         marginBottom: 16,
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F9FAFB',
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#E5E7EB',
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: '#F3F4F6',
         paddingHorizontal: 16,
-        minHeight: 56,
+        minHeight: 60,
     },
     inputWrapperFocused: {
         backgroundColor: '#FFFFFF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
         elevation: 2,
     },
     iconContainer: {
@@ -637,11 +715,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     floatingLabel: {
-        marginBottom: 4,
+        marginBottom: 2,
     },
     floatingLabelText: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     required: {
         color: '#EF4444',
@@ -649,67 +727,71 @@ const styles = StyleSheet.create({
     modernInput: {
         fontSize: 16,
         color: '#111827',
-        paddingVertical: 0,
-        minHeight: 24,
+        fontWeight: '600',
+        paddingVertical: 4,
     },
     modernInputMultiline: {
         minHeight: 60,
         paddingTop: 8,
     },
+    errorText: {
+        color: '#EF4444',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 4,
+        marginLeft: 4,
+    },
     row: {
         flexDirection: 'row',
+        width: '100%',
         justifyContent: 'space-between',
-        gap: 12,
     },
     halfWidth: {
-        flex: 1,
+        width: '48%',
     },
     submitButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#D1D5DB',
-        borderRadius: 14,
-        paddingVertical: 16,
-        marginTop: 8,
+        borderRadius: 18,
+        height: 64,
+        marginTop: 12,
         marginBottom: 16,
-        gap: 8,
-    },
-    submitButtonActive: {
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        gap: 10,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 6,
     },
     submitButtonText: {
         color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '800',
     },
     helperText: {
         fontSize: 12,
         color: '#9CA3AF',
         textAlign: 'center',
         lineHeight: 18,
+        paddingHorizontal: 20,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     successContainer: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 24,
+        borderRadius: 30,
         padding: 32,
         alignItems: 'center',
         width: '85%',
-        maxWidth: 400,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
     },
     checkmarkCircle: {
         width: 100,
@@ -722,10 +804,9 @@ const styles = StyleSheet.create({
     },
     successTitle: {
         fontSize: 24,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#111827',
         marginBottom: 12,
-        textAlign: 'center',
     },
     successMessage: {
         fontSize: 16,
@@ -733,8 +814,5 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 24,
         marginBottom: 24,
-    },
-    successLoader: {
-        marginTop: 8,
     },
 });

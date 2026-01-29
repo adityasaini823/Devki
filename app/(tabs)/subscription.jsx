@@ -9,6 +9,8 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  FlatList,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../_theme/ThemeProvider';
@@ -18,11 +20,13 @@ import {
   useGetSubscriptionQuery,
   useCreateOrUpdateSubscriptionMutation,
   useCancelSubscriptionMutation,
+  useGetSubscriptionHistoryQuery,
 } from '../../src/redux/api/subscriptionApi';
 import {
   useGetSubscriptionProductsQuery,
 } from '../../src/redux/api/subscriptionProductApi';
 import { useGetSettingsQuery } from '../../src/redux/api/settingsApi';
+import { useGetDeliveryHistoryQuery } from '../../src/redux/api/deliveryApi';
 
 // Frequency options generally stay static or could be moved to DB later
 const FREQUENCY_OPTIONS = [
@@ -67,6 +71,15 @@ const getIconForSlot = (slot) => {
   return 'time-outline';
 };
 
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'active': return '#10B981';
+    case 'paused': return '#F59E0B';
+    case 'cancelled': return '#EF4444';
+    default: return '#6B7280';
+  }
+};
+
 export default function Subscription() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -75,6 +88,7 @@ export default function Subscription() {
   // Fetch data
   const { data: productsData, isLoading: isLoadingProducts, refetch: refetchProducts } = useGetSubscriptionProductsQuery();
   const { data: subscriptionData, isLoading: isLoadingSubscription, refetch: refetchSubscription } = useGetSubscriptionQuery();
+  const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useGetSubscriptionHistoryQuery();
   const { data: settingsData, isLoading: isLoadingSettings, refetch: refetchSettings } = useGetSettingsQuery();
 
   const [createOrUpdateSubscription, { isLoading: isSaving }] = useCreateOrUpdateSubscriptionMutation();
@@ -84,12 +98,14 @@ export default function Subscription() {
       refetchProducts();
       refetchSubscription();
       refetchSettings();
+      refetchHistory();
     }, [])
   );
 
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
   // Get products array
   const products = productsData?.products || [];
@@ -265,13 +281,18 @@ export default function Subscription() {
       {/* Custom Header - matching store header style */}
       <View style={[styles.header, { backgroundColor: theme.colors.primary, paddingTop: insets.top }]}>
         <Text style={styles.headerTitle}>Subscriptions</Text>
-        <TouchableOpacity onPress={() => Toast.show({
-          type: 'info',
-          text1: 'Subscription Info',
-          text2: 'Choose your daily milk quantity and delivery schedule.'
-        })}>
-          <Ionicons name="information-circle-outline" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 16 }}>
+          <TouchableOpacity onPress={() => setIsHistoryVisible(true)}>
+            <Ionicons name="time-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Toast.show({
+            type: 'info',
+            text1: 'Subscription Info',
+            text2: 'Choose your daily milk quantity and delivery schedule.'
+          })}>
+            <Ionicons name="information-circle-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {(isLoadingSubscription || isLoadingProducts || isLoadingSettings) ? (
@@ -559,6 +580,88 @@ export default function Subscription() {
           <View style={styles.bottomSpacer} />
         </ScrollView>
       )}
+
+      {/* History Modal */}
+      <Modal
+        visible={isHistoryVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsHistoryVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Subscription History</Text>
+            <TouchableOpacity onPress={() => setIsHistoryVisible(false)} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 16 }} />
+
+          {isLoadingHistory ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              data={historyData?.subscriptions || []}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="time-outline" size={48} color={theme.colors.muted} />
+                  <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No subscription history found</Text>
+                </View>
+              }
+              renderItem={({ item }) => (
+                <View style={[styles.historyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                  <View style={styles.historyHeader}>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+                      <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                        {item.status ? item.status.toUpperCase() : 'UNKNOWN'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.dateText, { color: theme.colors.muted }]}>
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.historyBody}>
+                    <View style={styles.productInfo}>
+                      <Text style={[styles.productName, { color: theme.colors.text }]}>
+                        {item.subscription_product?.name || 'Unknown Product'}
+                      </Text>
+                      <Text style={[styles.productDetails, { color: theme.colors.textSecondary }]}>
+                        {item.subscription_product?.quantity} • ₹{item.price_per_delivery}/day
+                      </Text>
+                    </View>
+                    <View style={styles.costInfo}>
+                      <Text style={[styles.totalCost, { color: theme.colors.primary }]}>
+                        ₹{item.monthly_estimate.toFixed(0)}/mo
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.historyFooter, { borderTopColor: theme.colors.border }]}>
+                    <View style={styles.footerItem}>
+                      <Ionicons name="calendar-outline" size={14} color={theme.colors.muted} />
+                      <Text style={[styles.footerText, { color: theme.colors.muted }]}>
+                        {FREQUENCY_OPTIONS.find(f => f.value === item.frequency)?.label || item.frequency}
+                      </Text>
+                    </View>
+                    <View style={styles.footerItem}>
+                      <Ionicons name="time-outline" size={14} color={theme.colors.muted} />
+                      <Text style={[styles.footerText, { color: theme.colors.muted }]}>
+                        {item.delivery_time}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -755,5 +858,111 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  listContent: {
+    padding: 16,
+    gap: 16,
+  },
+  historyCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dateText: {
+    fontSize: 12,
+  },
+  historyBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  productInfo: {
+    gap: 4,
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  productDetails: {
+    fontSize: 14,
+  },
+  costInfo: {
+    alignItems: 'flex-end',
+  },
+  totalCost: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  historyFooter: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingTop: 12,
+    gap: 16,
+  },
+  footerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  footerText: {
+    fontSize: 13,
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderColor: 'transparent',
+  },
+  activeTab: {
+    // Border color handled inline with theme
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

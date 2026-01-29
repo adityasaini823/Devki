@@ -37,6 +37,10 @@ export interface GetSubscriptionResponse extends ApiResponse {
   subscription: Subscription | null;
 }
 
+export interface GetSubscriptionHistoryResponse extends ApiResponse {
+  subscriptions: Subscription[];
+}
+
 export const subscriptionApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Create or update subscription
@@ -53,6 +57,15 @@ export const subscriptionApi = baseApi.injectEndpoints({
     getSubscription: builder.query<GetSubscriptionResponse, void>({
       query: () => ({
         url: '/subscriptions',
+        method: 'GET',
+      }),
+      providesTags: ['Subscription'],
+    }),
+
+    // Get subscription history
+    getSubscriptionHistory: builder.query<GetSubscriptionHistoryResponse, void>({
+      query: () => ({
+        url: '/subscriptions/history',
         method: 'GET',
       }),
       providesTags: ['Subscription'],
@@ -81,6 +94,7 @@ export const subscriptionApi = baseApi.injectEndpoints({
 export const {
   useCreateOrUpdateSubscriptionMutation,
   useGetSubscriptionQuery,
+  useGetSubscriptionHistoryQuery,
   usePauseSubscriptionMutation,
   useCancelSubscriptionMutation,
 } = subscriptionApi;

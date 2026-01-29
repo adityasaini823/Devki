@@ -1,61 +1,109 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Animated, Dimensions, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from './_theme/ThemeProvider';
 import { tokenStorage } from '../src/utils/tokenStorage';
+
+const { width } = Dimensions.get('window');
 
 export default function Welcome() {
     const router = useRouter();
-    const [isChecking, setIsChecking] = useState(true);
-    
+    const { theme } = useTheme();
+    const [isChecking, setIsChecking] = React.useState(true);
+
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
     useEffect(() => {
         checkAuthStatus();
+
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                friction: 8,
+                tension: 40,
+                useNativeDriver: true,
+            })
+        ]).start();
     }, []);
-    
+
     const checkAuthStatus = async () => {
         try {
             const token = await tokenStorage.getToken();
             const refreshToken = await tokenStorage.getRefreshToken();
-            
-            // If we have either token, user is potentially authenticated
-            // The baseApi will handle token refresh automatically on API calls
-            // If refresh token is expired, API will return 403 and we'll redirect to login
+
             if (token || refreshToken) {
-                // User has tokens, redirect to tabs
-                // baseApi will handle refreshing access token if needed
-                router.replace('/(tabs)');
+                // Small delay to show splash feel
+                setTimeout(() => {
+                    router.replace('/(tabs)');
+                }, 1500);
             } else {
-                // No tokens at all, redirect to login
-                router.replace('/(auth)/login');
+                setIsChecking(false);
             }
         } catch (error) {
             console.error('Auth check error:', error);
-            // On error, clear tokens and redirect to login
             await tokenStorage.removeToken();
-            router.replace('/(auth)/login');
-        } finally {
             setIsChecking(false);
         }
     };
-    
+
     const handleGetStarted = () => {
         router.push('/(auth)/login');
     };
-    
-    if (isChecking) {
-        return (
-            <View style={[styles.container, styles.centered]}>
-                <ActivityIndicator size="large" color="#007AFF" />
-                <Text style={styles.loadingText}>Checking authentication...</Text>
-            </View>
-        );
-    }
-    
+
     return (
-        <View style={styles.container}>  
-            <View>
-                <Text style={styles.title}>Welcome to Devki</Text>
+        <View style={styles.container}>
+            <LinearGradient
+                colors={[theme.colors.primary, theme.colors.primary + 'CC']}
+                style={StyleSheet.absoluteFill}
+            />
+
+            <View style={styles.content}>
+                <Animated.View
+                    style={[
+                        styles.logoContainer,
+                        {
+                            opacity: fadeAnim,
+                            transform: [{ scale: scaleAnim }]
+                        }
+                    ]}
+                >
+                    <Image
+                        source={require('../assets/images/devki-logo.png')}
+                        style={styles.logo}
+                        contentFit="contain"
+                    />
+                </Animated.View>
+
+                <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
+                    <Text style={styles.title}>Devki Farm</Text>
+                    <Text style={styles.subtitle}>Your Trusted Source for Pure & Organic Products</Text>
+                </Animated.View>
             </View>
-            <Button title="Get Started" onPress={handleGetStarted} />
+
+            {isChecking ? (
+                <View style={styles.footer}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                </View>
+            ) : (
+                <Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={handleGetStarted}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[styles.buttonText, { color: theme.colors.primary }]}>Get Started</Text>
+                    </TouchableOpacity>
+                </Animated.View>
+            )}
         </View>
     );
 }
@@ -63,22 +111,66 @@ export default function Welcome() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    content: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 40,
     },
-    centered: {
-        justifyContent: 'center',
+    logoContainer: {
+        width: 140,
+        height: 140,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 40,
+        padding: 6,
+        marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    logo: {
+        width: '100%',
+        height: '100%',
+    },
+    textContainer: {
         alignItems: 'center',
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 20,
+        fontSize: 44,
+        fontWeight: '900',
+        color: '#FFFFFF',
+        letterSpacing: -1,
     },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#666',
+    subtitle: {
+        fontSize: 18,
+        color: 'rgba(255, 255, 255, 0.9)',
+        marginTop: 8,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    footer: {
+        paddingHorizontal: 40,
+        paddingBottom: 60,
+        alignItems: 'center',
+    },
+    button: {
+        width: '100%',
+        height: 64,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    buttonText: {
+        fontSize: 18,
+        fontWeight: '800',
     },
 });
-

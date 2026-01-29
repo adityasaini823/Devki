@@ -9,6 +9,8 @@ import {
     ActivityIndicator,
     RefreshControl,
     Alert,
+    Modal,
+    FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../_theme/ThemeProvider';
@@ -17,6 +19,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import {
     useGetMyDeliveriesQuery,
     useSkipDeliveryMutation,
+    useGetDeliveryHistoryQuery,
 } from '../../src/redux/api/deliveryApi';
 import { useGetSubscriptionQuery } from '../../src/redux/api/subscriptionApi';
 
@@ -45,16 +48,29 @@ const formatDate = (dateString) => {
     });
 };
 
-const getStatusIcon = (status) => {
+const getStatusConfig = (statusInput) => {
+    const status = typeof statusInput === 'string' ? statusInput : statusInput?.status;
+    // console.log(status);
     switch (status) {
         case 'delivered':
-            return { name: 'checkmark-circle', color: '#10b981' };
+            return { name: 'checkmark-circle', color: '#10b981', bgColor: '#ecfdf5', label: 'Delivered' };
         case 'skipped':
-            return { name: 'close-circle', color: '#6b7280' };
+            return { name: 'close-circle', color: '#6b7280', bgColor: '#f3f4f6', label: 'Skipped' };
         case 'missed':
-            return { name: 'alert-circle', color: '#ef4444' };
+            return { name: 'alert-circle', color: '#ef4444', bgColor: '#fef2f2', label: 'Missed' };
+        case 'scheduled': {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const scheduledDate = new Date(statusInput?.date || Date.now());
+            scheduledDate.setHours(0, 0, 0, 0);
+            
+            if (scheduledDate < now) {
+                return { name: 'time', color: '#F59E0B', bgColor: '#FEF3C7', label: 'Missed' };
+            }
+            return { name: 'time', color: '#3b82f6', bgColor: '#eff6ff', label: 'Scheduled' };
+        }
         default:
-            return { name: 'time', color: '#3b82f6' };
+            return { name: 'help-circle', color: '#6b7280', bgColor: '#f3f4f6', label: status };
     }
 };
 
@@ -65,13 +81,17 @@ export default function Deliveries() {
 
     const { data: subscriptionData, refetch: refetchSubscription } = useGetSubscriptionQuery();
     const { data: deliveriesData, isLoading, isFetching, refetch: refetchDeliveries } = useGetMyDeliveriesQuery({});
+    const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useGetDeliveryHistoryQuery();
     const [skipDelivery, { isLoading: isSkipping }] = useSkipDeliveryMutation();
+
+    const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
     // Refetch data when screen comes into focus
     useFocusEffect(
         React.useCallback(() => {
             refetchSubscription();
             refetchDeliveries();
+            refetchHistory();
         }, [])
     );
 
@@ -88,15 +108,21 @@ export default function Deliveries() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const upcomingDeliveries = deliveries.filter((d) => {
-        const dDate = new Date(d.scheduled_date);
-        dDate.setHours(0, 0, 0, 0);
-        return dDate >= today && d.status === 'scheduled';
-    });
+    const upcomingDeliveries = deliveries
+        .filter((d) => {
+            const dDate = new Date(d.scheduled_date);
+            dDate.setHours(0, 0, 0, 0);
+            return dDate >= today && d.status === 'scheduled';
+        })
+        .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date)); // Closest first
 
-    const pastDeliveries = deliveries.filter((d) => {
-        return d.status !== 'scheduled';
-    });
+    const pastDeliveries = deliveries
+        .filter((d) => {
+            const dDate = new Date(d.scheduled_date);
+            dDate.setHours(0, 0, 0, 0);
+            return d.status !== 'scheduled' || dDate < today;
+        })
+        .sort((a, b) => new Date(b.scheduled_date) - new Date(a.scheduled_date)); // Newest first (reverse chronological)
 
     const handleSkip = (delivery) => {
         Alert.alert(
@@ -129,42 +155,78 @@ export default function Deliveries() {
     };
 
     const renderDeliveryItem = (delivery, isUpcoming) => {
-        const statusIcon = getStatusIcon(delivery.status);
-        const canSkip = isUpcoming && delivery.status === 'scheduled';
+        const statusConfig = getStatusConfig({
+            status: delivery.status,
+            date: delivery.scheduled_date
+        });
+        
+        const dDate = new Date(delivery.scheduled_date);
+        dDate.setHours(0, 0, 0, 0);
+        const isToday = dDate.getTime() === today.getTime();
+        
+        const canSkip = isUpcoming && delivery.status === 'scheduled' && !isToday;
 
         return (
             <View
                 key={delivery._id}
-                style={[styles.deliveryItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+                style={[
+                    styles.deliveryItem,
+                    { 
+                        backgroundColor: theme.colors.card, 
+                        borderColor: theme.colors.border,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 2,
+                        elevation: 2,
+                    }
+                ]}
             >
-                <View style={styles.deliveryLeft}>
-                    <Ionicons name={statusIcon.name} size={24} color={statusIcon.color} />
-                </View>
-                <View style={styles.deliveryCenter}>
-                    <Text style={[styles.deliveryDate, { color: theme.colors.textPrimary }]}>
-                        {formatDate(delivery.scheduled_date)}
-                    </Text>
-                    <Text style={[styles.deliveryDetails, { color: theme.colors.textSecondary }]}>
-                        {delivery.delivery_time === 'morning' ? '🌅 Morning' : (delivery.delivery_time === 'evening' ? '🌙 Evening' : `🕒 ${delivery.delivery_time}`)} • {delivery.product_quantity}
-                    </Text>
-                    <Text style={[styles.deliveryPrice, { color: theme.colors.primary }]}>
-                        ₹{delivery.price}
-                    </Text>
-                </View>
-                <View style={styles.deliveryRight}>
-                    {canSkip ? (
-                        <TouchableOpacity
-                            style={[styles.skipButton, { borderColor: theme.colors.error }]}
-                            onPress={() => handleSkip(delivery)}
-                            disabled={isSkipping}
-                        >
-                            <Text style={[styles.skipButtonText, { color: theme.colors.error }]}>Skip</Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <Text style={[styles.statusText, { color: statusIcon.color }]}>
-                            {delivery.status.charAt(0).toUpperCase() + delivery.status.slice(1)}
-                        </Text>
-                    )}
+                <View style={[styles.statusIndicator, { backgroundColor: statusConfig.color }]} />
+                
+                <View style={styles.deliveryContent}>
+                    <View style={styles.deliveryMainInfo}>
+                        <View style={styles.deliveryLeftInfo}>
+                            <Text style={[styles.deliveryDate, { color: theme.colors.textPrimary }]}>
+                                {formatDate(delivery.scheduled_date)}
+                            </Text>
+                            <View style={styles.deliveryTimeRow}>
+                                <Ionicons 
+                                    name={delivery.delivery_time === 'morning' ? 'sunny-outline' : 'moon-outline'} 
+                                    size={14} 
+                                    color={theme.colors.textSecondary} 
+                                />
+                                <Text style={[styles.deliveryDetails, { color: theme.colors.textSecondary }]}>
+                                    {delivery.delivery_time.charAt(0).toUpperCase() + delivery.delivery_time.slice(1)} • {delivery.product_quantity}
+                                </Text>
+                            </View>
+                        </View>
+                        
+                        <View style={styles.deliveryPriceContainer}>
+                            <Text style={[styles.deliveryPrice, { color: theme.colors.primary }]}>
+                                ₹{delivery.price}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.deliveryFooter}>
+                        <View style={[styles.statusBadgeSmall, { backgroundColor: statusConfig.bgColor }]}>
+                            <Ionicons name={statusConfig.name} size={12} color={statusConfig.color} />
+                            <Text style={[styles.statusBadgeSmallText, { color: statusConfig.color }]}>
+                                {statusConfig.label}
+                            </Text>
+                        </View>
+
+                        {canSkip && (
+                            <TouchableOpacity
+                                style={styles.skipButtonContainer}
+                                onPress={() => handleSkip(delivery)}
+                                disabled={isSkipping}
+                            >
+                                <Text style={[styles.skipButtonLabel, { color: theme.colors.error }]}>Skip Delivery</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
             </View>
         );
@@ -174,23 +236,25 @@ export default function Deliveries() {
         return (
             <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
                 <View style={[styles.header, { backgroundColor: theme.colors.primary, paddingTop: insets.top }]}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButtonStyle}>
                         <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>My Deliveries</Text>
                     <View style={styles.headerSpacer} />
                 </View>
                 <View style={styles.emptyContainer}>
-                    <Ionicons name="calendar-outline" size={64} color={theme.colors.muted} />
+                    <View style={styles.emptyIconContainer}>
+                        <Ionicons name="calendar-outline" size={80} color={theme.colors.muted} />
+                    </View>
                     <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No Active Subscription</Text>
                     <Text style={[styles.emptyText, { color: theme.colors.muted }]}>
-                        Subscribe to start receiving milk deliveries
+                        You don't have an active subscription yet. Subscribe to get fresh milk delivered to your doorstep everyday!
                     </Text>
                     <TouchableOpacity
                         style={[styles.ctaButton, { backgroundColor: theme.colors.primary }]}
                         onPress={() => router.push('/(tabs)/subscription')}
                     >
-                        <Text style={styles.ctaButtonText}>Subscribe Now</Text>
+                        <Text style={styles.ctaButtonText}>Start Subscription</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -201,17 +265,19 @@ export default function Deliveries() {
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             {/* Header */}
             <View style={[styles.header, { backgroundColor: theme.colors.primary, paddingTop: insets.top }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButtonStyle}>
                     <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Deliveries</Text>
-                <View style={styles.headerSpacer} />
+                <TouchableOpacity onPress={() => setIsHistoryVisible(true)} style={styles.headerIconStyle}>
+                    <Ionicons name="time-outline" size={24} color="#fff" />
+                </TouchableOpacity>
             </View>
 
             {isLoading ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text style={[styles.loadingText, { color: theme.colors.muted }]}>Loading deliveries...</Text>
+                    <Text style={[styles.loadingText, { color: theme.colors.muted }]}>Fetching your deliveries...</Text>
                 </View>
             ) : (
                 <ScrollView
@@ -222,30 +288,66 @@ export default function Deliveries() {
                         <RefreshControl refreshing={isFetching} onRefresh={handleRefresh} tintColor={theme.colors.primary} />
                     }
                 >
-                    {/* Subscription Summary */}
-                    <View style={[styles.summaryCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                    {/* Subscription Summary Card */}
+                    <View style={[styles.summaryCard, { 
+                        backgroundColor: theme.colors.card, 
+                        borderColor: theme.colors.border,
+                        shadowColor: theme.colors.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 8,
+                        elevation: 4,
+                    }]}>
                         <View style={styles.summaryHeader}>
-                            <Text style={[styles.summaryTitle, { color: theme.colors.textPrimary }]}>
-                                🥛 {subscription.subscription_product.quantity} {subscription.frequency}
-                            </Text>
+                            <View>
+                                <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>ACTIVE PLAN</Text>
+                                <Text style={[styles.summaryTitle, { color: theme.colors.textPrimary }]}>
+                                    {subscription.subscription_product.quantity} {subscription.frequency}
+                                </Text>
+                            </View>
                             <View style={[styles.statusBadge, { backgroundColor: '#10b981' }]}>
                                 <Text style={styles.statusBadgeText}>Active</Text>
                             </View>
                         </View>
-                        <Text style={[styles.summaryDetails, { color: theme.colors.textSecondary }]}>
-                            {subscription.delivery_time === 'morning' ? '🌅 Morning' : (subscription.delivery_time === 'evening' ? '🌙 Evening' : `🕒 ${subscription.delivery_time}`)} delivery • ₹{subscription.price_per_delivery}/delivery
-                        </Text>
+                        
+                        <View style={styles.separator} />
+                        
+                        <View style={styles.summaryInfoGrid}>
+                            <View style={styles.summaryInfoItem}>
+                                <Ionicons name="time-outline" size={16} color={theme.colors.primary} />
+                                <Text style={[styles.summaryInfoText, { color: theme.colors.textSecondary }]}>
+                                    {subscription.delivery_time === 'morning' ? 'Morning 06-08 AM' : 'Evening 06-08 PM'}
+                                </Text>
+                            </View>
+                            <View style={styles.summaryInfoItem}>
+                                <Ionicons name="cash-outline" size={16} color={theme.colors.primary} />
+                                <Text style={[styles.summaryInfoText, { color: theme.colors.textSecondary }]}>
+                                    ₹{subscription.price_per_delivery} / delivery
+                                </Text>
+                            </View>
+                        </View>
                     </View>
 
                     {/* Upcoming Deliveries */}
                     <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-                            📅 Upcoming Deliveries
-                        </Text>
-                        {upcomingDeliveries.length === 0 ? (
-                            <Text style={[styles.emptySection, { color: theme.colors.muted }]}>
-                                No upcoming deliveries scheduled. Check back soon!
+                        <View style={styles.sectionHeader}>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                                Upcoming Deliveries
                             </Text>
+                            <View style={[styles.countBadge, { backgroundColor: theme.colors.accentSoft }]}>
+                                <Text style={[styles.countBadgeText, { color: theme.colors.primary }]}>
+                                    {upcomingDeliveries.length}
+                                </Text>
+                            </View>
+                        </View>
+                        
+                        {upcomingDeliveries.length === 0 ? (
+                            <View style={[styles.emptySectionCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                                <Ionicons name="calendar-outline" size={32} color={theme.colors.muted} />
+                                <Text style={[styles.emptySection, { color: theme.colors.muted }]}>
+                                    No upcoming deliveries scheduled.
+                                </Text>
+                            </View>
                         ) : (
                             upcomingDeliveries.map((d) => renderDeliveryItem(d, true))
                         )}
@@ -254,14 +356,106 @@ export default function Deliveries() {
                     {/* Past Deliveries */}
                     {pastDeliveries.length > 0 && (
                         <View style={styles.section}>
-                            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-                                📜 Past Deliveries
-                            </Text>
-                            {pastDeliveries.slice(0, 7).map((d) => renderDeliveryItem(d, false))}
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                                    Recent History
+                                </Text>
+                            </View>
+                            {pastDeliveries.slice(0, 10).map((d) => renderDeliveryItem(d, false))}
+                            
+                            {pastDeliveries.length > 10 && (
+                                <TouchableOpacity 
+                                    style={[styles.viewAllButton, { borderColor: theme.colors.primary }]}
+                                    onPress={() => setIsHistoryVisible(true)}
+                                >
+                                    <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>View All History</Text>
+                                    <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+                                </TouchableOpacity>
+                            )}
                         </View>
                     )}
                 </ScrollView>
             )}
+
+            {/* History Modal */}
+            <Modal
+                visible={isHistoryVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setIsHistoryVisible(false)}
+            >
+                <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+                    <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Delivery History</Text>
+                        <TouchableOpacity onPress={() => setIsHistoryVisible(false)} style={styles.closeButton}>
+                            <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {isLoadingHistory ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={theme.colors.primary} />
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={historyData?.deliveries || []}
+                            keyExtractor={(item) => item._id}
+                            contentContainerStyle={styles.listContent}
+                            ListEmptyComponent={
+                                <View style={styles.emptyContainer}>
+                                    <Ionicons name="cube-outline" size={48} color={theme.colors.muted} />
+                                    <Text style={[styles.emptyText, { color: theme.colors.muted }]}>No delivery history found</Text>
+                                </View>
+                            }
+                            renderItem={({ item }) => {
+                                const isSkipped = item.status === 'skipped';
+                                const isMissed = item.status === 'missed';
+                                const statusConfig = getStatusConfig({
+                                    status: item.status,
+                                    date: item.scheduled_date
+                                });
+                                const statusColor = statusConfig.color;
+
+                                return (
+                                    <View style={[styles.historyCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                                        <View style={styles.historyCardHeader}>
+                                            <Text style={[styles.dateTextLabel, { fontWeight: '700', fontSize: 14, color: theme.colors.textPrimary }]}>
+                                                {new Date(item.scheduled_date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                                            </Text>
+                                            <View style={[styles.statusBadgeHistory, { backgroundColor: statusConfig.bgColor }]}>
+                                                <Text style={[styles.statusTextHistory, { color: statusColor }]}>
+                                                    {statusConfig.label.toUpperCase()}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.historyCardBody}>
+                                            <View style={styles.productInfo}>
+                                                <Text style={[styles.productDetails, { color: theme.colors.textPrimary }]}>
+                                                    {item.product_quantity || '1L'} • {item.subscription_id?.delivery_time || 'Morning'}
+                                                </Text>
+                                                {item.notes ? (
+                                                    <Text style={[styles.notesText, { color: theme.colors.muted, marginTop: 4, fontStyle: 'italic' }]}>
+                                                        "{item.notes}"
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                            <View style={styles.costInfo}>
+                                                <Text style={[styles.totalCost, { fontSize: 14, fontWeight: '700', color: item.payment_status === 'deducted' ? theme.colors.error : theme.colors.muted }]}>
+                                                    {item.payment_status === 'deducted' ? `-₹${item.price}` : `₹${item.price}`}
+                                                </Text>
+                                                <Text style={[styles.paymentStatusText, { fontSize: 10, color: theme.colors.muted, textAlign: 'right' }]}>
+                                                    {item.payment_status === 'deducted' ? 'Paid' : 'No Charge'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                );
+                            }}
+                        />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -275,11 +469,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingBottom: 12,
+        paddingBottom: 16,
         minHeight: 60,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
-    backButton: {
+    backButtonStyle: {
         padding: 8,
+        marginLeft: -8,
     },
     headerTitle: {
         fontSize: 20,
@@ -293,32 +490,49 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 12,
+        padding: 20,
     },
     loadingText: {
         fontSize: 16,
+        marginTop: 12,
+        fontWeight: '500',
     },
     emptyContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 40,
-        gap: 12,
+        padding: 32,
+    },
+    emptyIconContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: '#f3f4f6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
     },
     emptyTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginTop: 16,
-    },
-    emptyText: {
-        fontSize: 14,
+        fontSize: 22,
+        fontWeight: '800',
+        marginBottom: 12,
         textAlign: 'center',
     },
+    emptyText: {
+        fontSize: 15,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 32,
+    },
     ctaButton: {
-        paddingVertical: 14,
-        paddingHorizontal: 32,
-        borderRadius: 12,
-        marginTop: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 40,
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     ctaButtonText: {
         color: '#fff',
@@ -329,94 +543,253 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 16,
+        padding: 20,
         paddingBottom: 40,
     },
     summaryCard: {
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 20,
+        padding: 20,
         borderWidth: 1,
-        marginBottom: 20,
+        marginBottom: 28,
+    },
+    summaryLabel: {
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1.2,
+        marginBottom: 4,
     },
     summaryHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
+        alignItems: 'flex-start',
     },
     summaryTitle: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 22,
+        fontWeight: '800',
         textTransform: 'capitalize',
     },
     statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    statusBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    separator: {
+        height: 1,
+        backgroundColor: '#f1f5f9',
+        marginVertical: 16,
+    },
+    summaryInfoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 16,
+    },
+    summaryInfoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    summaryInfoText: {
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    section: {
+        marginBottom: 28,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+        paddingHorizontal: 4,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    countBadge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
     },
-    statusBadgeText: {
-        color: '#fff',
+    countBadgeText: {
         fontSize: 12,
-        fontWeight: '600',
-    },
-    summaryDetails: {
-        fontSize: 14,
-    },
-    section: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 16,
         fontWeight: '700',
-        marginBottom: 12,
+    },
+    emptySectionCard: {
+        padding: 24,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        alignItems: 'center',
+        gap: 8,
     },
     emptySection: {
         fontSize: 14,
+        fontWeight: '500',
         textAlign: 'center',
-        paddingVertical: 20,
     },
     deliveryItem: {
         flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 12,
-        padding: 14,
+        borderRadius: 18,
         borderWidth: 1,
-        marginBottom: 10,
+        marginBottom: 14,
+        overflow: 'hidden',
     },
-    deliveryLeft: {
-        marginRight: 12,
+    statusIndicator: {
+        width: 6,
+        height: '100%',
     },
-    deliveryCenter: {
+    deliveryContent: {
+        flex: 1,
+        padding: 16,
+    },
+    deliveryMainInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    deliveryLeftInfo: {
         flex: 1,
     },
     deliveryDate: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 2,
+        fontSize: 17,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    deliveryTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
     deliveryDetails: {
         fontSize: 13,
-        marginBottom: 2,
+        fontWeight: '500',
+    },
+    deliveryPriceContainer: {
+        alignItems: 'flex-end',
     },
     deliveryPrice: {
+        fontSize: 17,
+        fontWeight: '800',
+    },
+    deliveryFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderTopWidth: 1,
+        borderTopColor: '#f8fafc',
+        paddingTop: 12,
+    },
+    statusBadgeSmall: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    statusBadgeSmallText: {
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    skipButtonContainer: {
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+    },
+    skipButtonLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    headerIconStyle: {
+        padding: 8,
+        marginRight: -8,
+    },
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        marginTop: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        gap: 8,
+    },
+    viewAllText: {
         fontSize: 14,
         fontWeight: '600',
     },
-    deliveryRight: {
-        marginLeft: 12,
+    modalContainer: {
+        flex: 1,
     },
-    skipButton: {
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 8,
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    listContent: {
+        padding: 16,
+    },
+    historyCard: {
+        borderRadius: 16,
         borderWidth: 1,
+        padding: 16,
+        marginBottom: 12,
     },
-    skipButtonText: {
-        fontWeight: '600',
-        fontSize: 13,
+    historyCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
     },
-    statusText: {
-        fontWeight: '600',
-        fontSize: 13,
+    dateTextLabel: {
+        fontSize: 14,
+    },
+    statusBadgeHistory: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    statusTextHistory: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    historyCardBody: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    productInfo: {
+        flex: 1,
+    },
+    notesText: {
+        fontSize: 12,
+    },
+    costInfo: {
+        alignItems: 'flex-end',
+    },
+    totalCost: {
+        fontSize: 14,
+    },
+    paymentStatusText: {
+        fontSize: 10,
     },
 });
+
